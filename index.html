@@ -195,8 +195,12 @@
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[440px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
             <div class="font-semibold text-xl mb-4">Редактировать карточку</div>
             <div class="space-y-3">
-                <div><label class="block text-sm mb-1">Передняя сторона</label><input type="text" id="edit-english" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target"></div>
-                <div><label class="block text-sm mb-1">Обратная сторона</label><input type="text" id="edit-russian" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target"></div>
+                <div><label class="block text-sm mb-1">Передняя сторона</label>
+                    <textarea id="edit-english" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" rows="2"></textarea>
+                </div>
+                <div><label class="block text-sm mb-1">Обратная сторона</label>
+                    <textarea id="edit-russian" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" rows="2"></textarea>
+                </div>
             </div>
             <div class="mt-4">
                 <button onclick="resetCardProgressFromModal()" class="w-full py-3 rounded-xl border border-red-200 text-red-600 flex items-center justify-center gap-x-2 text-sm touch-target">
@@ -232,8 +236,12 @@
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6">
             <div class="font-semibold text-xl mb-4">Добавить слово</div>
             <div class="space-y-3">
-                <div><label class="block text-sm mb-1">Передняя сторона</label><input type="text" id="new-english" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target"></div>
-                <div><label class="block text-sm mb-1">Обратная сторона</label><input type="text" id="new-russian" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target"></div>
+                <div><label class="block text-sm mb-1">Передняя сторона</label>
+                    <textarea id="new-english" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" rows="2"></textarea>
+                </div>
+                <div><label class="block text-sm mb-1">Обратная сторона</label>
+                    <textarea id="new-russian" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" rows="2"></textarea>
+                </div>
             </div>
             <div class="flex gap-3 mt-4">
                 <button onclick="hideAddCardModal()" class="flex-1 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-base touch-target">Отмена</button>
@@ -1180,7 +1188,7 @@
             }
         }
 
-        // ========== ИСПРАВЛЕННАЯ viewCard (одна кнопка для обоих слов) ==========
+        // ========== ИСПРАВЛЕННАЯ viewCard (две отдельные кнопки) ==========
         function viewCard(cardId) {
             const folder = getCurrentFolder();
             const card = folder.cards.find(c => c.id === cardId);
@@ -1190,11 +1198,18 @@
             const content = document.getElementById('card-view-content');
             content.innerHTML = `
                 <div class="study-card" style="cursor:default; min-height:200px;">
-                    <div class="word-english">${escapeHtml(card.english)}</div>
-                    <div class="word-russian mt-2">${escapeHtml(card.russian)}</div>
-                    <button onclick="event.stopImmediatePropagation(); speakWord('${escJs(card.english)}'); speakWord('${escJs(card.russian)}')" class="speak-btn">
-                        <i class="fa-solid fa-volume-up"></i>
-                    </button>
+                    <div class="flex items-center justify-center gap-x-3">
+                        <div class="word-english">${escapeHtml(card.english)}</div>
+                        <button onclick="event.stopImmediatePropagation(); speakWord('${escJs(card.english)}')" class="speak-btn" style="margin-top:0;">
+                            <i class="fa-solid fa-volume-up"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-center gap-x-3 mt-2">
+                        <div class="word-russian">${escapeHtml(card.russian)}</div>
+                        <button onclick="event.stopImmediatePropagation(); speakWord('${escJs(card.russian)}')" class="speak-btn" style="margin-top:0;">
+                            <i class="fa-solid fa-volume-up"></i>
+                        </button>
+                    </div>
                     ${card.image ? `<img src="${card.image}" class="max-h-48 mx-auto rounded-2xl mt-4">` : ''}
                 </div>
             `;
@@ -1530,7 +1545,6 @@
                         </button>
                     </div>
 
-                    <!-- НОВЫЙ БЛОК: СТАТИСТИКА И ДОСТИЖЕНИЯ -->
                     <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4">
                         <div class="font-semibold text-base mb-3">Статистика и достижения</div>
                         <button onclick="resetAchievements()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
