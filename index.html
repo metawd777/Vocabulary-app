@@ -17,103 +17,102 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        html, body {
-            margin:0;
-            padding:0;
-            height:100%;
-            overflow:hidden;
-            font-family: Georgia, 'Times New Roman', serif;
-        }
+        html, body { margin:0; padding:0; height:100%; overflow:hidden; font-family: system-ui, -apple-system, sans-serif; }
         body { background:#f1f5f9; color:#0f172a; display:flex; flex-direction:column; }
         .dark body { background:#0f172a; color:#f1f5f9; }
         ::-webkit-scrollbar { display:none; }
         .touch-target { min-height:48px; min-width:48px; }
-        .header-top { padding-top: max(env(safe-area-inset-top,12px),12px); flex-shrink:0; z-index:10; }
+
+        .header-top { padding-top: max(env(safe-area-inset-top,12px),12px); flex-shrink:0; z-index:10; color:#0f172a; }
+        .dark .header-top { color:#f1f5f9; }
         #main-content { flex:1; overflow:hidden; display:flex; flex-direction:column; padding:0 16px; padding-bottom:0; }
         .bottom-nav { flex-shrink:0; padding-bottom:env(safe-area-inset-bottom,0); background:white; border-top:1px solid #e2e8f0; }
         .dark .bottom-nav { background:#0f172a; border-top-color:#1e293b; }
-        .theme-btn { width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-radius:9999px; font-size:1.5rem; background:transparent; color:#64748b; transition:all 0.2s; border:none; cursor:pointer; }
-        .dark .theme-btn { color:#94a3b8; }
-        .theme-btn.active { background:#0d9488 !important; color:#fff !important; box-shadow:0 0 0 3px rgba(13,148,136,0.5); transform:scale(1.12); border:2px solid #14b8a6; }
+        .bottom-nav button { color:#475569; }
+        .dark .bottom-nav button { color:#cbd5e1; }
 
-        /* === КАРТОЧКИ КАК В ANKI: центрирование по умолчанию === */
-        .card-text {
-            white-space: pre-wrap;
-            word-break: break-word;
-            overflow-wrap: break-word;
-            max-width: 100%;
-            padding: 0 4px;
-            text-align: center;           /* ← центрирование по умолчанию (как в Anki) */
-            width: 100%;
-            font-family: Georgia, 'Times New Roman', serif;
+        .theme-btn {
+            width:44px; height:44px; display:flex; align-items:center; justify-content:center;
+            border-radius:9999px; font-size:1.5rem; background:transparent; color:#64748b;
+            transition: all 0.2s cubic-bezier(0.4,0,0.2,1); border:none; cursor:pointer;
         }
-        /* Если текст длинный (более 3 строк) — автоматически выравниваем по левому краю */
-        .card-text.text-long {
-            text-align: left;
+        .dark .theme-btn { color:#94a3b8; }
+        .theme-btn.active {
+            background-color: #0d9488 !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.5) !important;
+            transform: scale(1.12);
+            border: 2px solid #14b8a6;
         }
-        .card-text-sm { font-size: 1.2rem; }
-        .card-text-md { font-size: 1.8rem; }
-        .card-text-lg { font-size: 2.2rem; }
-        @media (max-width: 480px) {
-            .card-text-lg { font-size: 1.8rem; }
-            .card-text-md { font-size: 1.5rem; }
-            .card-text-sm { font-size: 1rem; }
+        .dark .theme-btn.active {
+            background-color: #14b8a6 !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.6) !important;
+            border: 2px solid #5eead4;
+            transform: scale(1.12);
         }
 
         .study-card {
-            background: white; border-radius:24px; border:1px solid #e2e8f0;
-            padding:20px 16px; min-height:200px; width:100%;
-            display:flex; flex-direction:column; align-items:center; justify-content:center;
-            max-width:100%; overflow:hidden;
+            background: white; border-radius: 24px; border: 1px solid #e2e8f0;
+            padding: 20px 16px; min-height: 200px; width: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            position: relative;
+            max-width: 100%;
+            overflow: hidden;
         }
         .dark .study-card { background:#1e293b; border-color:#334155; }
 
-        .rating-buttons { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding-top:12px; }
-        .rating-btn { padding:12px 0; border-radius:16px; font-weight:500; font-size:1rem; text-align:center; border:none; cursor:pointer; }
+        .study-card .word-english,
+        .study-card .word-russian {
+            max-width: 100%;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            text-align: center;
+            padding: 0 4px;
+            line-height: 1.3;
+            width: 100%;
+        }
+        .study-card .word-english { font-size: 2.5rem; }
+        .study-card .word-russian { font-size: 2rem; }
+
+        @media (max-width: 480px) {
+            .study-card .word-english { font-size: 2rem; }
+            .study-card .word-russian { font-size: 1.6rem; }
+        }
+
+        .study-container { display: flex; flex-direction: column; height: 100%; padding-top: 4px; }
+        .study-card-wrapper { flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; }
+
+        .study-card .image-area { width: 100%; max-width: 200px; margin-bottom: 12px; position: relative; }
+        .study-card .image-area img { width: 100%; max-height: 140px; object-fit: contain; border-radius: 16px; }
+        .study-card .image-placeholder {
+            width: 100%; max-width: 200px; height: 70px; border: 2px dashed #cbd5e1; border-radius: 16px;
+            display: flex; align-items: center; justify-content: center; font-size: 14px; color: #94a3b8; gap: 8px; cursor: pointer; margin-bottom: 12px;
+        }
+        .dark .study-card .image-placeholder { border-color: #475569; }
+
+        .study-card .speak-btn { color: #0d9488; font-size: 1.5rem; margin-top: 4px; background: none; border: none; cursor: pointer; }
+
+        .rating-buttons { flex-shrink:0; padding-top:12px; padding-bottom:12px; display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+        .rating-btn { padding:12px 0; border-radius:16px; font-weight:500; font-size:1rem; text-align:center; transition:transform 0.1s; border:none; cursor:pointer; }
+        .rating-btn:active { transform:scale(0.95); }
         .progress-area { font-size:0.875rem; color:#64748b; }
         .dark .progress-area { color:#94a3b8; }
         .scrollable-content { overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch; }
         .modal-content { max-height:90vh; overflow-y:auto; }
-        .folder-item, .card-item { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
-        .context-menu-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000; animation:fadeIn .2s; }
-        .context-menu { background:white; border-radius:28px; padding:16px 0; min-width:260px; max-width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.3); animation:slideUp .25s; }
-        .dark .context-menu { background:#1e293b; }
-        .context-menu-item { display:flex; align-items:center; padding:14px 24px; width:100%; border:none; background:transparent; font-size:1rem; color:#0f172a; cursor:pointer; gap:14px; text-align:left; font-weight:500; -webkit-user-select:none; user-select:none; }
-        .dark .context-menu-item { color:#f1f5f9; }
-        .context-menu-item:active { background:#f1f5f9; }
-        .dark .context-menu-item:active { background:#334155; }
-        .context-menu-item.danger { color:#ef4444; }
-        .context-menu-divider { height:1px; background:#e2e8f0; margin:4px 16px; }
-        .dark .context-menu-divider { background:#334155; }
-        @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
-        @keyframes slideUp { from { transform:translateY(20px) scale(0.98); opacity:0; } to { transform:translateY(0) scale(1); opacity:1; } }
-        .image-area { width:100%; max-width:200px; margin:0 auto 12px; position:relative; }
-        .image-placeholder { width:100%; max-width:200px; height:70px; border:2px dashed #cbd5e1; border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:14px; color:#94a3b8; gap:8px; cursor:pointer; margin:0 auto 12px; }
-        .dark .image-placeholder { border-color:#475569; }
-        .speak-btn { color:#0d9488; font-size:1.5rem; background:none; border:none; cursor:pointer; padding:8px; }
-        .study-container { display:flex; flex-direction:column; height:100%; padding-top:4px; }
-        .study-card-wrapper { flex:1; display:flex; flex-direction:column; justify-content:center; min-height:0; }
-        #mastered-suggestion { animation:fadeInUp 0.3s ease-out; }
-        @keyframes fadeInUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
 
-        textarea.card-input {
-            width:100%;
-            padding:10px 12px;
-            border-radius:12px;
-            border:1px solid #cbd5e1;
-            background:transparent;
-            font-size:1rem;
-            resize:vertical;
-            min-height:60px;
-            max-height:200px;
-            font-family:Georgia, 'Times New Roman', serif;
-            color:inherit;
+        .dark .study-card,
+        .dark .bg-white {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
         }
-        .dark textarea.card-input {
-            border-color:#475569;
-            background:#1e293b;
-            color:#f1f5f9;
-        }
+        .dark .text-slate-600,
+        .dark .text-slate-500 { color:#94a3b8 !important; }
+        .dark .border-slate-200 { border-color:#334155 !important; }
+        .dark .text-slate-400 { color:#94a3b8 !important; }
+        .dark .study-card .word-english { color:#f1f5f9; }
+        .dark .study-card .word-russian { color:#2dd4bf; }
     </style>
 </head>
 <body class="text-slate-900 dark:text-slate-100">
@@ -143,10 +142,18 @@
     <!-- Нижняя навигация -->
     <div class="bottom-nav max-w-3xl mx-auto w-full">
         <div class="grid grid-cols-4 text-center py-1 text-xs">
-            <button onclick="showFoldersView()" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target"><i class="fa-solid fa-folder text-xl mb-0.5"></i><span>Колоды</span></button>
-            <button onclick="startStudy()" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target"><i class="fa-solid fa-graduation-cap text-xl mb-0.5"></i><span>Учить</span></button>
-            <button onclick="showImportModal()" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target"><i class="fa-solid fa-file-import text-xl mb-0.5"></i><span>Импорт</span></button>
-            <button onclick="showManagementMenu()" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target"><i class="fa-solid fa-ellipsis-v text-xl mb-0.5"></i><span>Действия</span></button>
+            <button onclick="showFoldersView()" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target">
+                <i class="fa-solid fa-folder text-xl mb-0.5"></i><span>Колоды</span>
+            </button>
+            <button onclick="startStudy()" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target">
+                <i class="fa-solid fa-graduation-cap text-xl mb-0.5"></i><span>Учить</span>
+            </button>
+            <button onclick="showImportModal()" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target">
+                <i class="fa-solid fa-file-import text-xl mb-0.5"></i><span>Импорт</span>
+            </button>
+            <button onclick="showManagementMenu()" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target">
+                <i class="fa-solid fa-ellipsis-v text-xl mb-0.5"></i><span>Действия</span>
+            </button>
         </div>
     </div>
 
@@ -155,8 +162,12 @@
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
             <div id="card-view-content" class="text-center"></div>
             <div class="flex gap-3 mt-6">
-                <button onclick="editFromViewModal()" class="flex-1 py-3 rounded-2xl border border-slate-300 dark:border-slate-600 flex items-center justify-center gap-x-2 text-base touch-target"><i class="fa-solid fa-edit"></i> <span>Редактировать</span></button>
-                <button onclick="resetFromViewModal()" class="flex-1 py-3 rounded-2xl border border-red-200 text-red-600 flex items-center justify-center gap-x-2 text-base touch-target"><i class="fa-solid fa-undo"></i> <span>Сбросить</span></button>
+                <button onclick="editFromViewModal()" class="flex-1 py-3 rounded-2xl border border-slate-300 dark:border-slate-600 flex items-center justify-center gap-x-2 text-base touch-target">
+                    <i class="fa-solid fa-edit"></i> <span>Редактировать</span>
+                </button>
+                <button onclick="resetFromViewModal()" class="flex-1 py-3 rounded-2xl border border-red-200 text-red-600 flex items-center justify-center gap-x-2 text-base touch-target">
+                    <i class="fa-solid fa-undo"></i> <span>Сбросить</span>
+                </button>
             </div>
             <button onclick="hideCardViewModal()" class="mt-3 w-full py-3 text-sm text-slate-500 touch-target">Закрыть</button>
         </div>
@@ -167,20 +178,30 @@
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[440px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
             <div class="font-semibold text-xl mb-4">Редактировать карточку</div>
             <div class="space-y-3">
-                <div><label class="block text-sm mb-1">Передняя сторона</label>
-                    <textarea id="edit-english" class="card-input" rows="2" placeholder="Введите текст..."></textarea>
-                </div>
-                <div><label class="block text-sm mb-1">Обратная сторона</label>
-                    <textarea id="edit-russian" class="card-input" rows="2" placeholder="Введите перевод..."></textarea>
-                </div>
-            </div>
-            <div id="delete-photo-container" class="mt-2 hidden">
-                <button onclick="deletePhotoFromCard()" class="w-full py-3 rounded-xl border border-red-200 text-red-600 flex items-center justify-center gap-x-2 text-sm touch-target"><i class="fa-solid fa-image"></i> <span>Удалить фото</span></button>
+                <div><label class="block text-sm mb-1">Передняя сторона</label><input type="text" id="edit-english" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target"></div>
+                <div><label class="block text-sm mb-1">Обратная сторона</label><input type="text" id="edit-russian" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target"></div>
             </div>
             <div class="mt-4">
-                <button onclick="resetCardProgressFromModal()" class="w-full py-3 rounded-xl border border-red-200 text-red-600 flex items-center justify-center gap-x-2 text-sm touch-target"><i class="fa-solid fa-undo"></i> <span>Сбросить прогресс</span></button>
+                <button onclick="resetCardProgressFromModal()" class="w-full py-3 rounded-xl border border-red-200 text-red-600 flex items-center justify-center gap-x-2 text-sm touch-target">
+                    <i class="fa-solid fa-undo"></i> <span>Сбросить прогресс</span>
+                </button>
             </div>
-            <button id="mastered-action-btn" class="mt-3 w-full py-3 rounded-xl border flex items-center justify-center gap-x-2 text-sm touch-target"></button>
+            <details class="mt-3">
+                <summary class="cursor-pointer text-sm text-slate-500 dark:text-slate-400">Дополнительные параметры (FSRS)</summary>
+                <div class="pt-3 grid grid-cols-2 gap-3">
+                    <div><label class="block text-xs mb-1">Стабильность</label><input type="number" step="0.01" id="edit-stability" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800"></div>
+                    <div><label class="block text-xs mb-1">Сложность</label><input type="number" step="0.01" id="edit-difficulty" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800"></div>
+                    <div><label class="block text-xs mb-1">Статус</label>
+                        <select id="edit-state" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800">
+                            <option value="new">Новая</option>
+                            <option value="learning">Изучается</option>
+                            <option value="review">На повторении</option>
+                            <option value="relearning">Переучивается</option>
+                        </select>
+                    </div>
+                    <div><label class="block text-xs mb-1">След. повторение</label><input type="date" id="edit-next-date" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800"></div>
+                </div>
+            </details>
             <div class="flex gap-3 mt-4">
                 <button onclick="hideEditModal()" class="flex-1 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-base touch-target">Отмена</button>
                 <button onclick="saveEditedCard()" class="flex-1 py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target">Сохранить</button>
@@ -194,12 +215,8 @@
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6">
             <div class="font-semibold text-xl mb-4">Добавить слово</div>
             <div class="space-y-3">
-                <div><label class="block text-sm mb-1">Передняя сторона</label>
-                    <textarea id="new-english" class="card-input" rows="2" placeholder="Введите текст..."></textarea>
-                </div>
-                <div><label class="block text-sm mb-1">Обратная сторона</label>
-                    <textarea id="new-russian" class="card-input" rows="2" placeholder="Введите перевод..."></textarea>
-                </div>
+                <div><label class="block text-sm mb-1">Передняя сторона</label><input type="text" id="new-english" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target"></div>
+                <div><label class="block text-sm mb-1">Обратная сторона</label><input type="text" id="new-russian" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target"></div>
             </div>
             <div class="flex gap-3 mt-4">
                 <button onclick="hideAddCardModal()" class="flex-1 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-base touch-target">Отмена</button>
@@ -208,12 +225,12 @@
         </div>
     </div>
 
-    <!-- Остальные модалки -->
+    <!-- Модалка импорта -->
     <div id="importModal" onclick="hideImportModal()" class="hidden fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]">
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
             <div class="font-semibold text-xl mb-4">Импорт слов</div>
             <div class="mb-3"><label class="block text-sm mb-1">Колода</label><select id="import-folder-select" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 touch-target"></select></div>
-            <textarea id="import-text" placeholder="beautiful - красивый&#10;hello - привет" class="w-full h-32 p-3 rounded-xl border dark:bg-slate-800 font-mono text-sm"></textarea>
+            <textarea id="import-text" placeholder="beautiful - красивый&#10;hello - привет" class="w-full h-32 p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 font-mono text-sm"></textarea>
             <div class="flex gap-3 mt-3">
                 <button onclick="hideImportModal()" class="flex-1 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-base touch-target">Отмена</button>
                 <button onclick="importWords()" class="flex-1 py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target">Импорт</button>
@@ -225,20 +242,34 @@
         </div>
     </div>
 
+    <!-- Модалка действий -->
     <div id="managementModal" onclick="hideManagementMenu()" class="hidden fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]">
         <div onclick="event.stopImmediatePropagation()" class="relative bg-white dark:bg-slate-800 w-full sm:w-[380px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
-            <button onclick="hideManagementMenu()" aria-label="Закрыть" class="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 touch-target"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <button onclick="hideManagementMenu()" aria-label="Закрыть" class="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 touch-target">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
             <div class="font-semibold text-xl mb-4 pr-8">Действия</div>
             <div class="space-y-2">
-                <button onclick="createFolder(); hideManagementMenu()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target"><i class="fa-solid fa-plus w-5 text-teal-600"></i> <span>Создать колоду</span></button>
-                <button onclick="exportAllData(); hideManagementMenu()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target"><i class="fa-solid fa-file-export w-5 text-teal-600"></i> <span>Экспорт всех данных</span></button>
-                <button onclick="showResetFolderSelectionModal(); hideManagementMenu()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target"><i class="fa-solid fa-undo w-5 text-amber-500"></i> <span>Сбросить прогресс выбранной колоды</span></button>
-                <button onclick="resetAllProgress(); hideManagementMenu()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target"><i class="fa-solid fa-xmark w-5 text-red-500"></i> <span>Сбросить прогресс всех колод</span></button>
-                <button onclick="hideManagementMenu(); showDeleteFolderModal()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-red-600 text-base touch-target"><i class="fa-solid fa-trash w-5"></i> <span>Удалить колоду</span></button>
+                <button onclick="createFolder(); hideManagementMenu()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
+                    <i class="fa-solid fa-plus w-5 text-teal-600"></i> <span>Создать колоду</span>
+                </button>
+                <button onclick="exportAllData(); hideManagementMenu()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
+                    <i class="fa-solid fa-file-export w-5 text-teal-600"></i> <span>Экспорт всех данных</span>
+                </button>
+                <button onclick="showResetFolderSelectionModal(); hideManagementMenu()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
+                    <i class="fa-solid fa-undo w-5 text-amber-500"></i> <span>Сбросить прогресс выбранной колоды</span>
+                </button>
+                <button onclick="resetAllProgress(); hideManagementMenu()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
+                    <i class="fa-solid fa-xmark w-5 text-slate-800 dark:text-slate-200"></i> <span>Сбросить прогресс всех колод</span>
+                </button>
+                <button onclick="hideManagementMenu(); showDeleteFolderModal()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-red-600 text-base touch-target">
+                    <i class="fa-solid fa-trash w-5"></i> <span>Удалить колоду</span>
+                </button>
             </div>
         </div>
     </div>
 
+    <!-- Модалка выбора колоды для сброса прогресса -->
     <div id="resetFolderSelectionModal" onclick="hideResetFolderSelectionModal()" class="hidden fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]">
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
             <div class="font-semibold text-xl mb-4">Выберите колоду для сброса прогресса</div>
@@ -259,7 +290,7 @@
         let editingCardId = null;
         let viewingCardId = null;
 
-        // ==================== ХРАНЕНИЕ И МИГРАЦИЯ ====================
+        // ==================== ХРАНЕНИЕ ====================
         async function loadData() {
             try {
                 const stored = await localforage.getItem('folders');
@@ -275,44 +306,6 @@
             } catch (e) {
                 console.warn('Ошибка загрузки', e);
                 folders = [{ id: 'default', name: 'Основная колода', cards: [] }];
-            }
-            migrateData();
-        }
-
-        function migrateData() {
-            let changed = false;
-            let mastered = folders.find(f => f.name === 'Изученные слова' && f.system !== true);
-            if (mastered) {
-                mastered.system = true;
-                changed = true;
-            } else if (!folders.some(f => f.system === true)) {
-                const newMastered = {
-                    id: 'mastered_' + Date.now(),
-                    name: 'Изученные слова',
-                    system: true,
-                    cards: []
-                };
-                folders.push(newMastered);
-                changed = true;
-            }
-            folders.forEach(folder => {
-                if (folder.system === undefined) {
-                    folder.system = false;
-                    changed = true;
-                }
-                folder.cards.forEach(card => {
-                    if (card.lastGrade === undefined) {
-                        card.lastGrade = undefined;
-                        changed = true;
-                    }
-                    if (card.masteredSuggestionDismissed === undefined) {
-                        card.masteredSuggestionDismissed = false;
-                        changed = true;
-                    }
-                });
-            });
-            if (changed) {
-                saveData();
             }
         }
 
@@ -336,7 +329,6 @@
         const REQUESTED_RETENTION = 0.9;
         const LEARNING_STEPS_MIN = [10, 60, 240];
         const RELEARN_STEPS_MIN = [10, 60];
-        const MAX_INTERVAL_DAYS = 365;
 
         function clampDifficulty(d) { return Math.min(10, Math.max(1, d)); }
         function fsrsRetrievability(elapsedDays, stability) {
@@ -407,8 +399,7 @@
                         card.stability = fsrsInitialStability(3);
                         card.difficulty = fsrsInitialDifficulty(3);
                         delete card.learningStep;
-                        let interval = Math.max(1, fuzzDays(fsrsIntervalDays(card.stability)));
-                        interval = Math.min(interval, MAX_INTERVAL_DAYS);
+                        const interval = Math.max(1, fuzzDays(fsrsIntervalDays(card.stability)));
                         card.nextReviewDate = addDays(now, interval).toISOString();
                     } else {
                         card.state = 'learning'; card.learningStep = nextStep;
@@ -419,8 +410,7 @@
                     card.stability = fsrsInitialStability(4);
                     card.difficulty = fsrsInitialDifficulty(4);
                     delete card.learningStep;
-                    let interval = Math.max(1, fuzzDays(fsrsIntervalDays(card.stability)));
-                    interval = Math.min(interval, MAX_INTERVAL_DAYS);
+                    const interval = Math.max(1, fuzzDays(fsrsIntervalDays(card.stability)));
                     card.nextReviewDate = addDays(now, interval).toISOString();
                 }
             } else if (card.state === 'relearning') {
@@ -436,8 +426,7 @@
                     if (grade === 4 || nextStep >= RELEARN_STEPS_MIN.length) {
                         card.state = 'review';
                         delete card.learningStep;
-                        let interval = Math.max(1, fuzzDays(fsrsIntervalDays(card.stability)));
-                        interval = Math.min(interval, MAX_INTERVAL_DAYS);
+                        const interval = Math.max(1, fuzzDays(fsrsIntervalDays(card.stability)));
                         card.nextReviewDate = addDays(now, interval).toISOString();
                     } else {
                         card.learningStep = nextStep;
@@ -458,8 +447,7 @@
                     const newStability = fsrsNextStabilityOnSuccess(card.difficulty, card.stability, r, grade);
                     card.difficulty = fsrsNextDifficulty(card.difficulty, grade);
                     card.stability = newStability;
-                    let interval = Math.max(1, fuzzDays(fsrsIntervalDays(card.stability)));
-                    interval = Math.min(interval, MAX_INTERVAL_DAYS);
+                    const interval = Math.max(1, fuzzDays(fsrsIntervalDays(card.stability)));
                     card.nextReviewDate = addDays(now, interval).toISOString();
                 }
             }
@@ -468,18 +456,7 @@
         }
 
         function makeFreshCardProgress() {
-            return {
-                state: 'new',
-                reps: 0,
-                lapses: 0,
-                stability: undefined,
-                difficulty: undefined,
-                learningStep: undefined,
-                last_review: null,
-                nextReviewDate: new Date().toISOString(),
-                lastGrade: undefined,
-                masteredSuggestionDismissed: false
-            };
+            return { state: 'new', reps: 0, lapses: 0, stability: undefined, difficulty: undefined, learningStep: undefined, last_review: null, nextReviewDate: new Date().toISOString() };
         }
 
         function resetCardProgress(card) {
@@ -491,8 +468,6 @@
             delete card.learningStep;
             card.last_review = null;
             card.nextReviewDate = new Date().toISOString();
-            card.lastGrade = undefined;
-            card.masteredSuggestionDismissed = false;
         }
 
         function getDueCards(folder) {
@@ -517,7 +492,7 @@
             return { text, date: new Date(soonest.nextReviewDate) };
         }
 
-        // ==================== СЖАТИЕ КАРТИНОК ====================
+        // ==================== СЖАТИЕ ИЗОБРАЖЕНИЙ ====================
         function compressImage(file, maxWidth = 600, quality = 0.7) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
@@ -544,88 +519,13 @@
             await saveData();
         }
 
-        // ==================== TTS ====================
-        function detectLanguage(text) {
-            if (/[а-яё]/i.test(text)) return 'ru';
-            return 'en';
-        }
-
-        let voicesLoaded = false;
-        let voicesList = [];
-
-        function loadVoices() {
-            return new Promise((resolve) => {
-                if (voicesLoaded) { resolve(voicesList); return; }
-                if (!window.speechSynthesis) { resolve([]); return; }
-                const voices = window.speechSynthesis.getVoices();
-                if (voices.length > 0) {
-                    voicesList = voices;
-                    voicesLoaded = true;
-                    resolve(voices);
-                } else {
-                    window.speechSynthesis.onvoiceschanged = () => {
-                        voicesList = window.speechSynthesis.getVoices();
-                        voicesLoaded = true;
-                        resolve(voicesList);
-                    };
-                }
-            });
-        }
-
-        async function speakWord(text) {
-            if (!text) return;
-            const lang = detectLanguage(text);
-            const langCode = lang === 'en' ? 'en-US' : 'ru';
-            const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${langCode}&client=tw-ob&q=${encodeURIComponent(text)}`;
-            try {
-                const response = await fetch(url, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                        'Referer': 'https://translate.google.com/',
-                    }
-                });
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const audioUrl = URL.createObjectURL(blob);
-                    const audio = new Audio(audioUrl);
-                    audio.play();
-                    audio.onended = () => URL.revokeObjectURL(audioUrl);
-                    return;
-                }
-            } catch (e) {
-                console.warn('Google TTS error, using fallback', e);
-                await fallbackSpeak(text, lang);
-            }
-        }
-
-        async function fallbackSpeak(text, lang) {
-            if (!window.speechSynthesis) return;
-            window.speechSynthesis.cancel();
-            const voices = await loadVoices();
-            const langPrefix = lang === 'en' ? 'en' : 'ru';
-            let preferredVoice = voices.find(v => v.lang.startsWith(langPrefix) && v.default === true);
-            if (!preferredVoice) {
-                preferredVoice = voices.find(v => v.lang.startsWith(langPrefix));
-            }
-            if (!preferredVoice && voices.length > 0) {
-                preferredVoice = voices[0];
-            }
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = lang === 'en' ? 'en-US' : 'ru-RU';
-            utterance.rate = 0.9;
-            utterance.pitch = 1;
-            utterance.volume = 1;
-            if (preferredVoice) utterance.voice = preferredVoice;
-            window.speechSynthesis.speak(utterance);
-        }
-
-        if (window.speechSynthesis) { loadVoices(); }
-
         // ==================== ТЕМА ====================
         function setTheme(mode) {
             const html = document.documentElement;
             localStorage.setItem('themeMode', mode);
+
             document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
+
             let isDark;
             if (mode === 'light') {
                 isDark = false;
@@ -640,6 +540,7 @@
                 isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
                 html.classList.toggle('dark', isDark);
             }
+
             const metaTheme = document.querySelector('meta[name="theme-color"]');
             if (metaTheme) metaTheme.setAttribute('content', isDark ? '#0f172a' : '#ffffff');
         }
@@ -647,6 +548,7 @@
         function initTheme() {
             const saved = localStorage.getItem('themeMode') || 'auto';
             setTheme(saved);
+
             const media = window.matchMedia('(prefers-color-scheme: dark)');
             media.addEventListener('change', () => {
                 if (localStorage.getItem('themeMode') === 'auto') {
@@ -670,327 +572,7 @@
             return results;
         }
 
-        // ==================== ИЗУЧЕННЫЕ СЛОВА ====================
-        function getMasteredFolder() {
-            let mastered = folders.find(f => f.system === true);
-            if (!mastered) {
-                mastered = { id: 'mastered_' + Date.now(), name: 'Изученные слова', system: true, cards: [] };
-                folders.push(mastered);
-                saveData();
-            }
-            return mastered;
-        }
-
-        async function moveCardToMastered(card) {
-            if (!card) return;
-            const currentFolder = getCurrentFolder();
-            const masteredFolder = getMasteredFolder();
-            if (masteredFolder.cards.some(c => c.id === card.id)) return;
-            currentFolder.cards = currentFolder.cards.filter(c => c.id !== card.id);
-            masteredFolder.cards.push(card);
-            await saveData();
-        }
-
-        async function markCurrentCardAsMastered() {
-            if (currentCardIndex >= dueCards.length) return;
-            const card = dueCards[currentCardIndex];
-            if (!card) return;
-            await updateCardAfterReview(card, 4);
-            await moveCardToMastered(card);
-            dueCards.splice(currentCardIndex, 1);
-            initialDueCount--;
-            showCurrentCard();
-        }
-
-        async function moveEditingCardToMastered() {
-            if (!editingCardId) return;
-            const folder = getCurrentFolder();
-            const card = folder.cards.find(c => c.id === editingCardId);
-            if (!card || !confirm('Переместить эту карточку в «Изученные слова»?')) return;
-            await moveCardToMastered(card);
-            hideEditModal();
-            showFolderCards(currentFolderId);
-        }
-
-        async function returnCardFromMastered(cardId) {
-            const mastered = getMasteredFolder();
-            const card = mastered.cards.find(c => c.id === cardId);
-            if (!card) return;
-            const otherFolders = folders.filter(f => f.id !== mastered.id);
-            if (otherFolders.length === 0) {
-                alert('Нет других колод для возврата');
-                return;
-            }
-            const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[110]';
-            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-            let html = `
-                <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6">
-                    <div class="font-semibold text-xl mb-4">Вернуть в колоду</div>
-                    <div class="space-y-2">
-            `;
-            otherFolders.forEach(folder => {
-                html += `
-                    <button onclick="confirmReturnCard('${cardId}', '${folder.id}', this)"
-                            class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex justify-between items-center text-base touch-target">
-                        <span>${folder.name}</span>
-                        <span class="text-xs text-slate-400">${folder.cards.length} слов</span>
-                    </button>
-                `;
-            });
-            html += `
-                    </div>
-                    <button onclick="this.closest('.fixed').remove()" class="mt-4 w-full py-3 rounded-2xl border border-slate-300 dark:border-slate-600 text-base touch-target">Отмена</button>
-                </div>
-            `;
-            modal.innerHTML = html;
-            document.body.appendChild(modal);
-        }
-
-        async function confirmReturnCard(cardId, targetFolderId, btnElement) {
-            const modal = btnElement.closest('.fixed');
-            const masteredFolder = getMasteredFolder();
-            const targetFolder = folders.find(f => f.id === targetFolderId);
-            const card = masteredFolder.cards.find(c => c.id === cardId);
-            if (!card || !targetFolder) return;
-            if (targetFolder.cards.some(c => c.id === cardId)) {
-                alert('Эта карточка уже есть в выбранной колоде');
-                modal.remove();
-                return;
-            }
-            masteredFolder.cards = masteredFolder.cards.filter(c => c.id !== cardId);
-            targetFolder.cards.push(card);
-            await saveData();
-            modal.remove();
-            hideEditModal();
-            showFolderCards(currentFolderId);
-        }
-
-        // ==================== УМНОЕ ПРЕДЛОЖЕНИЕ ПЕРЕНОСА ====================
-        function shouldSuggestMastered(card) {
-            if (!card) return false;
-            if (!card.stability || card.stability < 25) return false;
-            if (card.difficulty > 4.0) return false;
-            if (card.reps < 5) return false;
-            if (card.state === 'relearning') return false;
-            if (card.masteredSuggestionDismissed) return false;
-            if (card.lastGrade === 1) return false;
-            return true;
-        }
-
-        function getSuggestionLevel(card) {
-            if (!card || !card.stability) return 'none';
-            if (card.stability >= 28) return 'high';
-            if (card.stability >= 25) return 'medium';
-            return 'none';
-        }
-
-        function showMasteredSuggestion(card, cardIndex) {
-            const oldSuggestion = document.getElementById('mastered-suggestion');
-            if (oldSuggestion) oldSuggestion.remove();
-
-            const level = getSuggestionLevel(card);
-            const isHigh = level === 'high';
-            const stabilityText = `Стабильность: ${Math.round(card.stability)} дней`;
-
-            const container = document.getElementById('main-content');
-
-            const div = document.createElement('div');
-            div.id = 'mastered-suggestion';
-            div.className = `mt-4 mx-1 p-4 rounded-2xl border ${
-                isHigh 
-                    ? 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-300 dark:border-emerald-700' 
-                    : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
-            }`;
-
-            div.innerHTML = `
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                        <div class="font-semibold text-emerald-700 dark:text-emerald-300">
-                            ${isHigh ? 'Слово хорошо закрепилось' : 'Слово уже стабильное'}
-                        </div>
-                        <div class="text-sm text-emerald-600 dark:text-emerald-400">${stabilityText}</div>
-                        <div class="text-xs text-emerald-500 dark:text-emerald-500 mt-1">Можно перенести в архив, чтобы не повторять часто</div>
-                    </div>
-                    
-                    <div class="flex flex-wrap gap-2">
-                        <button onclick="acceptMasteredSuggestion(${cardIndex})" 
-                                class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition-colors touch-target">
-                            В архив
-                        </button>
-                        
-                        <button onclick="dismissMasteredSuggestion(${cardIndex}, false)" 
-                                class="px-4 py-2 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 rounded-xl text-sm touch-target">
-                            Пока нет
-                        </button>
-                        
-                        <button onclick="dismissMasteredSuggestion(${cardIndex}, true)" 
-                                class="px-3 py-2 text-xs text-emerald-600 hover:text-red-500 transition-colors touch-target">
-                            Больше не предлагать
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            container.appendChild(div);
-        }
-
-        async function acceptMasteredSuggestion(cardIndex) {
-            const card = dueCards[cardIndex];
-            if (!card) return;
-            await moveCardToMastered(card);
-            dueCards.splice(cardIndex, 1);
-            initialDueCount--;
-            document.getElementById('mastered-suggestion')?.remove();
-            showCurrentCard();
-        }
-
-        async function dismissMasteredSuggestion(cardIndex, permanently) {
-            const card = dueCards[cardIndex];
-            if (!card) return;
-            if (permanently) {
-                card.masteredSuggestionDismissed = true;
-                await saveData();
-            }
-            document.getElementById('mastered-suggestion')?.remove();
-            showCurrentCard();
-        }
-
-        // ==================== КОНТЕКСТНОЕ МЕНЮ ДЛЯ КОЛОД ====================
-        function showFolderContextMenu(folderId) {
-            const folder = folders.find(f => f.id === folderId);
-            if (!folder) return;
-            const overlay = document.createElement('div');
-            overlay.className = 'context-menu-overlay';
-            overlay.onclick = function(e) { if (e.target === this) this.remove(); };
-            const menu = document.createElement('div');
-            menu.className = 'context-menu';
-            menu.onclick = (e) => e.stopPropagation();
-            menu.innerHTML = `
-                <button class="context-menu-item" data-action="rename"><i class="fa-solid fa-pen"></i> Переименовать</button>
-                <button class="context-menu-item" data-action="reset"><i class="fa-solid fa-rotate-left"></i> Сбросить прогресс</button>
-                <div class="context-menu-divider"></div>
-                <button class="context-menu-item danger" data-action="delete"><i class="fa-solid fa-trash"></i> Удалить колоду</button>
-            `;
-            overlay.appendChild(menu);
-            document.body.appendChild(overlay);
-            menu.querySelector('[data-action="rename"]').addEventListener('click', () => {
-                overlay.remove();
-                showRenameFolderModal(folderId);
-            });
-            menu.querySelector('[data-action="reset"]').addEventListener('click', () => {
-                overlay.remove();
-                resetSelectedFolderProgress(folderId);
-            });
-            menu.querySelector('[data-action="delete"]').addEventListener('click', () => {
-                overlay.remove();
-                if (confirm(`Удалить колоду «${folder.name}»?`)) {
-                    performDeleteFolder(folderId);
-                    showFoldersView();
-                }
-            });
-        }
-
-        function setupLongPress(element, folderId) {
-            let longPressTimer = null, isLongPressTriggered = false, startX = 0, startY = 0;
-            const startPress = (x, y) => {
-                startX = x; startY = y; isLongPressTriggered = false;
-                longPressTimer = setTimeout(() => {
-                    isLongPressTriggered = true;
-                    showFolderContextMenu(folderId);
-                    if (navigator.vibrate) navigator.vibrate(10);
-                }, 600);
-            };
-            const endPress = () => { clearTimeout(longPressTimer); longPressTimer = null; };
-            element.addEventListener('touchstart', (e) => {
-                const touch = e.touches[0];
-                startPress(touch.clientX, touch.clientY);
-            }, { passive: true });
-            element.addEventListener('touchmove', (e) => {
-                const touch = e.touches[0];
-                const dx = Math.abs(touch.clientX - startX);
-                const dy = Math.abs(touch.clientY - startY);
-                if (dx > 10 || dy > 10) endPress();
-            }, { passive: true });
-            element.addEventListener('touchend', (e) => {
-                endPress();
-                if (isLongPressTriggered) {
-                    e.preventDefault();
-                    isLongPressTriggered = false;
-                }
-            }, { passive: true });
-            element.addEventListener('touchcancel', endPress, { passive: true });
-            element.addEventListener('mousedown', (e) => {
-                startPress(e.clientX, e.clientY);
-            });
-            element.addEventListener('mouseup', (e) => {
-                endPress();
-                if (isLongPressTriggered) {
-                    e.preventDefault();
-                    isLongPressTriggered = false;
-                }
-            });
-            element.addEventListener('mouseleave', endPress);
-            element.addEventListener('contextmenu', (e) => e.preventDefault());
-        }
-
-        // ==================== ДОЛГОЕ НАЖАТИЕ НА КАРТОЧКУ ====================
-        function setupLongPressCard(element, cardId) {
-            let longPressTimer = null, isLongPressTriggered = false, startX = 0, startY = 0;
-            const startPress = (x, y) => {
-                startX = x; startY = y; isLongPressTriggered = false;
-                longPressTimer = setTimeout(() => {
-                    isLongPressTriggered = true;
-                    editCard(cardId);
-                    if (navigator.vibrate) navigator.vibrate(10);
-                }, 600);
-            };
-            const endPress = () => { clearTimeout(longPressTimer); longPressTimer = null; };
-            element.addEventListener('touchstart', (e) => {
-                const touch = e.touches[0];
-                startPress(touch.clientX, touch.clientY);
-            }, { passive: true });
-            element.addEventListener('touchmove', (e) => {
-                const touch = e.touches[0];
-                const dx = Math.abs(touch.clientX - startX);
-                const dy = Math.abs(touch.clientY - startY);
-                if (dx > 10 || dy > 10) endPress();
-            }, { passive: true });
-            element.addEventListener('touchend', (e) => {
-                endPress();
-                if (isLongPressTriggered) {
-                    e.preventDefault();
-                    isLongPressTriggered = false;
-                }
-            }, { passive: true });
-            element.addEventListener('touchcancel', endPress, { passive: true });
-            element.addEventListener('mousedown', (e) => {
-                startPress(e.clientX, e.clientY);
-            });
-            element.addEventListener('mouseup', (e) => {
-                endPress();
-                if (isLongPressTriggered) {
-                    e.preventDefault();
-                    isLongPressTriggered = false;
-                }
-            });
-            element.addEventListener('mouseleave', endPress);
-            element.addEventListener('contextmenu', (e) => e.preventDefault());
-        }
-
-        // ==================== УДАЛЕНИЕ ФОТО ====================
-        async function deletePhotoFromCard() {
-            if (!editingCardId) return;
-            const folder = getCurrentFolder();
-            const card = folder.cards.find(c => c.id === editingCardId);
-            if (!card || !card.image) return;
-            if (!confirm('Удалить фото из этой карточки?')) return;
-            card.image = null;
-            await saveData();
-            editCard(editingCardId);
-        }
-
-        // ==================== ОСНОВНЫЕ ЭКРАНЫ ====================
+        // ==================== UI ФУНКЦИИ ====================
         async function showFoldersView(initialQuery = '') {
             document.getElementById('current-folder-name').textContent = 'Мои колоды';
             const container = document.getElementById('main-content');
@@ -1020,22 +602,23 @@
                     resultsDiv.innerHTML = `
                         <div class="grid grid-cols-1 gap-3">
                             ${folders.map(f => `
-                                <div id="folder-${f.id}" class="folder-item bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 cursor-pointer touch-target" onclick="selectFolder('${f.id}')">
+                                <div onclick="selectFolder('${f.id}')" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 cursor-pointer touch-target">
                                     <div class="flex justify-between items-center">
                                         <div>
                                             <div class="font-semibold text-lg">${f.name}</div>
                                             <div class="text-sm text-slate-500 dark:text-slate-400">${f.cards.length} слов</div>
                                         </div>
-                                        <i class="fa-solid fa-folder text-3xl text-teal-500"></i>
+                                        <div class="flex items-center gap-x-3">
+                                            <button onclick="event.stopImmediatePropagation(); showRenameFolderModal('${f.id}')" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-teal-600 touch-target">
+                                                <i class="fa-solid fa-edit"></i>
+                                            </button>
+                                            <i class="fa-solid fa-folder text-3xl text-teal-500"></i>
+                                        </div>
                                     </div>
                                 </div>
                             `).join('')}
                         </div>
                     `;
-                    document.querySelectorAll('[id^="folder-"]').forEach(el => {
-                        const folderId = el.id.replace('folder-', '');
-                        setupLongPress(el, folderId);
-                    });
                     return;
                 }
                 const results = searchWords(query);
@@ -1044,7 +627,7 @@
                     : `<div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl overflow-hidden">` + 
                       results.map(card => `
                         <div onclick="editCardFromSearch('${card.folderId}', '${card.id}')" class="flex justify-between items-center px-4 py-3 border-b border-slate-100 dark:border-slate-800 last:border-b-0 cursor-pointer touch-target">
-                            <div class="card-text card-text-sm">${card.english} <span class="mx-2 text-slate-400">—</span> ${card.russian}</div>
+                            <div><span class="font-medium">${card.english}</span> <span class="mx-2 text-slate-400">—</span> <span class="text-slate-600 dark:text-slate-300">${card.russian}</span></div>
                             <div class="text-xs text-teal-600 dark:text-teal-400">${card.folderName}</div>
                         </div>
                       `).join('') + `</div>`;
@@ -1063,7 +646,7 @@
         async function createFolder() {
             const name = prompt('Название новой колоды:');
             if (!name || !name.trim()) return;
-            folders.push({ id: 'folder_' + Date.now(), name: name.trim(), cards: [], system: false });
+            folders.push({ id: 'folder_' + Date.now(), name: name.trim(), cards: [] });
             await saveData();
             showFoldersView();
         }
@@ -1117,18 +700,18 @@
                     <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl overflow-hidden">
                         ${folder.cards.length === 0 ? `<div class="p-6 text-center text-slate-500 dark:text-slate-400">В этой колоде пока нет слов</div>` : 
                         folder.cards.map(card => `
-                            <div id="card-${card.id}" class="card-item flex items-center px-4 py-3 border-b border-slate-100 dark:border-slate-800 last:border-b-0 cursor-pointer touch-target" onclick="viewCard('${card.id}')">
-                                <div class="flex-1 card-text card-text-sm">${card.english} <span class="mx-2 text-slate-400">—</span> ${card.russian}</div>
+                            <div onclick="viewCard('${card.id}')" class="flex items-center px-4 py-3 border-b border-slate-100 dark:border-slate-800 last:border-b-0 cursor-pointer touch-target">
+                                <div class="flex-1">
+                                    <span class="font-medium">${card.english}</span>
+                                    <span class="mx-2 text-slate-400">—</span>
+                                    <span class="text-slate-600 dark:text-slate-300">${card.russian}</span>
+                                </div>
                                 <button onclick="event.stopImmediatePropagation(); uploadImageForCard('${card.id}')" class="ml-2 text-xl text-slate-400 hover:text-teal-600 touch-target"><i class="fa-solid fa-camera"></i></button>
                             </div>
                         `).join('')}
                     </div>
                 </div>
             `;
-            document.querySelectorAll('[id^="card-"]').forEach(el => {
-                const cardId = el.id.replace('card-', '');
-                setupLongPressCard(el, cardId);
-            });
         }
 
         async function startStudy() {
@@ -1171,15 +754,6 @@
             }
         }
 
-        // Функция для определения, является ли текст длинным (более 3 строк)
-        function isTextLong(text) {
-            if (!text) return false;
-            // Считаем количество переносов строк
-            const lines = text.split('\n').length;
-            // Если больше 3 строк или текст содержит более 50 символов с пробелами
-            return lines > 3 || text.length > 50;
-        }
-
         function showCurrentCard() {
             if (currentCardIndex >= dueCards.length) {
                 const container = document.getElementById('main-content');
@@ -1198,25 +772,28 @@
             const card = dueCards[currentCardIndex];
             const hasImage = card.image && card.image.startsWith('data:image');
 
-            const done = currentCardIndex;
-            const total = initialDueCount;
-            const percent = total > 0 ? Math.round((done / total) * 100) : 0;
-            const progressHtml = `
-                <div class="progress-area flex justify-between items-center px-1">
-                    <span>Выполнено <b>${done}</b> из <b>${total}</b></span>
-                    <span class="text-teal-600 font-semibold">${percent}%</span>
-                </div>
-            `;
+            let progressHtml = '';
+            if (initialDueCount) {
+                const done = currentCardIndex;
+                const total = initialDueCount;
+                const percent = Math.round((done / total) * 100);
+                progressHtml = `
+                    <div class="progress-area flex justify-between items-center px-1">
+                        <span>Выполнено <b>${done}</b> из <b>${total}</b></span>
+                        <span class="text-teal-600 font-semibold">${percent}%</span>
+                    </div>
+                `;
+            }
 
             let imageHtml = hasImage 
-                ? `<div class="image-area"><img src="${card.image}" onclick="uploadImageForCurrentCard(event)" class="w-full max-h-36 object-contain rounded-2xl cursor-pointer"><button onclick="event.stopImmediatePropagation(); removeImageFromCurrentCard()" class="absolute top-1 right-1 w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg text-sm">✕</button></div>`
-                : `<div onclick="uploadImageForCurrentCard(event)" class="image-placeholder"><i class="fa-solid fa-camera text-lg"></i> <span>Добавить фото</span></div>`;
-
-            // Определяем, длинный ли текст
-            const isEnglishLong = isTextLong(card.english);
-            const isRussianLong = isTextLong(card.russian);
-            const englishAlignClass = isEnglishLong ? 'text-long' : '';
-            const russianAlignClass = isRussianLong ? 'text-long' : '';
+                ? `<div class="image-area relative">
+                     <img src="${card.image}" onclick="uploadImageForCurrentCard(event)" class="w-full max-h-36 object-contain rounded-2xl cursor-pointer">
+                     <button onclick="event.stopImmediatePropagation(); removeImageFromCurrentCard()" class="absolute top-1 right-1 w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg text-sm">✕</button>
+                   </div>`
+                : `<div onclick="uploadImageForCurrentCard(event)" class="image-placeholder">
+                     <i class="fa-solid fa-camera text-lg"></i>
+                     <span>Добавить фото</span>
+                   </div>`;
 
             const container = document.getElementById('main-content');
             container.innerHTML = `
@@ -1225,26 +802,24 @@
                     <div class="study-card-wrapper">
                         <div class="study-card" onclick="flipStudyCard()">
                             ${imageHtml}
-                            <div id="card-front" class="card-text card-text-lg ${englishAlignClass}" style="white-space:pre-wrap;word-break:break-word;width:100%;">${card.english}</div>
-                            <div id="card-back" class="card-text card-text-lg ${russianAlignClass}" style="white-space:pre-wrap;word-break:break-word;width:100%;display:none;">${card.russian}</div>
-                            <div class="flex gap-4 mt-4">
+                            <div id="card-front">
+                                <div class="word-english">${card.english}</div>
                                 <button onclick="event.stopImmediatePropagation(); speakWord('${card.english}')" class="speak-btn"><i class="fa-solid fa-volume-up"></i></button>
+                            </div>
+                            <div id="card-back" class="hidden">
+                                <div class="word-russian">${card.russian}</div>
                                 <button onclick="event.stopImmediatePropagation(); speakWord('${card.russian}')" class="speak-btn"><i class="fa-solid fa-volume-up"></i></button>
                             </div>
                         </div>
                     </div>
                     <div class="rating-buttons">
-                        <button onclick="rateCard(1)" class="rating-btn bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400">Снова</button>
-                        <button onclick="rateCard(2)" class="rating-btn bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400">Трудно</button>
-                        <button onclick="rateCard(3)" class="rating-btn bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400">Хорошо</button>
-                        <button onclick="rateCard(4)" class="rating-btn bg-teal-600 text-white">Легко</button>
+                        <button onclick="rateCard(1)" class="rating-btn bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400">Снова<br><span class="text-xs opacity-70">Забыл</span></button>
+                        <button onclick="rateCard(2)" class="rating-btn bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400">Трудно<br><span class="text-xs opacity-70">С усилием</span></button>
+                        <button onclick="rateCard(3)" class="rating-btn bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400">Хорошо<br><span class="text-xs opacity-70">Нормально</span></button>
+                        <button onclick="rateCard(4)" class="rating-btn bg-teal-600 text-white">Легко<br><span class="text-xs opacity-80">Сразу вспомнил</span></button>
                     </div>
-
-                    <div class="flex justify-between items-center px-2 pb-2 mt-2">
-                        <button onclick="markCurrentCardAsMastered()" class="text-xs text-emerald-600 flex items-center gap-x-1 touch-target">
-                            <i class="fa-solid fa-trophy"></i> <span>В архив</span>
-                        </button>
-                        <button onclick="resetCurrentCard()" class="text-xs text-red-500 flex items-center gap-x-1 touch-target">
+                    <div class="text-center pb-1">
+                        <button onclick="resetCurrentCard()" class="text-xs text-red-500 hover:text-red-600 flex items-center justify-center gap-x-1 mx-auto touch-target">
                             <i class="fa-solid fa-undo"></i> <span>Сбросить</span>
                         </button>
                     </div>
@@ -1256,23 +831,15 @@
             const front = document.getElementById('card-front');
             const back = document.getElementById('card-back');
             if (!front || !back) return;
-            front.style.display = (front.style.display === 'none' ? 'block' : 'none');
-            back.style.display = (back.style.display === 'none' ? 'block' : 'none');
+            front.classList.toggle('hidden');
+            back.classList.toggle('hidden');
         }
 
         async function rateCard(grade) {
             const card = dueCards[currentCardIndex];
-            if (!card) return;
-
             await updateCardAfterReview(card, grade);
-            card.lastGrade = grade;
-
-            if (grade >= 3 && shouldSuggestMastered(card)) {
-                showMasteredSuggestion(card, currentCardIndex);
-            } else {
-                currentCardIndex++;
-                showCurrentCard();
-            }
+            currentCardIndex++;
+            showCurrentCard();
         }
 
         async function resetCurrentCard() {
@@ -1294,22 +861,18 @@
             const card = folder.cards.find(c => c.id === cardId);
             if (!card) return;
             viewingCardId = cardId;
+
             const content = document.getElementById('card-view-content');
-
-            const isEnglishLong = isTextLong(card.english);
-            const isRussianLong = isTextLong(card.russian);
-            const englishAlignClass = isEnglishLong ? 'text-long' : '';
-            const russianAlignClass = isRussianLong ? 'text-long' : '';
-
             content.innerHTML = `
                 <div class="study-card" style="cursor:default; min-height:200px;">
-                    <div class="card-text card-text-lg ${englishAlignClass}" style="white-space:pre-wrap;word-break:break-word;width:100%;">${card.english}</div>
+                    <div class="word-english">${card.english}</div>
                     <button onclick="event.stopImmediatePropagation(); speakWord('${card.english}')" class="speak-btn"><i class="fa-solid fa-volume-up"></i></button>
-                    <div class="card-text card-text-lg ${russianAlignClass} mt-4" style="white-space:pre-wrap;word-break:break-word;width:100%;">${card.russian}</div>
+                    <div class="word-russian mt-2">${card.russian}</div>
                     <button onclick="event.stopImmediatePropagation(); speakWord('${card.russian}')" class="speak-btn"><i class="fa-solid fa-volume-up"></i></button>
                     ${card.image ? `<img src="${card.image}" class="max-h-48 mx-auto rounded-2xl mt-4">` : ''}
                 </div>
             `;
+
             document.getElementById('cardViewModal').classList.remove('hidden');
             document.getElementById('cardViewModal').classList.add('flex');
         }
@@ -1345,27 +908,11 @@
 
             document.getElementById('edit-english').value = card.english;
             document.getElementById('edit-russian').value = card.russian;
-
-            const deletePhotoContainer = document.getElementById('delete-photo-container');
-            if (card.image) {
-                deletePhotoContainer.classList.remove('hidden');
-            } else {
-                deletePhotoContainer.classList.add('hidden');
-            }
-
-            const actionBtn = document.getElementById('mastered-action-btn');
-            const isInMastered = folder.system === true;
-
-            if (isInMastered) {
-                actionBtn.innerHTML = `<i class="fa-solid fa-undo"></i> <span>Вернуть в колоду...</span>`;
-                actionBtn.className = "mt-3 w-full py-3 rounded-xl border border-amber-200 text-amber-600 flex items-center justify-center gap-x-2 text-sm touch-target";
-                actionBtn.onclick = () => returnCardFromMastered(editingCardId);
-            } else {
-                actionBtn.innerHTML = `<i class="fa-solid fa-trophy"></i> <span>Переместить в архив</span>`;
-                actionBtn.className = "mt-3 w-full py-3 rounded-xl border border-emerald-200 text-emerald-600 flex items-center justify-center gap-x-2 text-sm touch-target";
-                actionBtn.onclick = moveEditingCardToMastered;
-            }
-            actionBtn.style.display = 'flex';
+            document.getElementById('edit-stability').value = card.stability !== undefined ? card.stability.toFixed(2) : '';
+            document.getElementById('edit-difficulty').value = card.difficulty !== undefined ? card.difficulty.toFixed(2) : '';
+            document.getElementById('edit-state').value = card.state || 'new';
+            const d = new Date(card.nextReviewDate);
+            document.getElementById('edit-next-date').value = d.toISOString().split('T')[0];
 
             document.getElementById('editModal').classList.remove('hidden');
             document.getElementById('editModal').classList.add('flex');
@@ -1382,6 +929,13 @@
             if (!card) return;
             card.english = document.getElementById('edit-english').value.trim();
             card.russian = document.getElementById('edit-russian').value.trim();
+            const stabilityVal = document.getElementById('edit-stability').value;
+            const difficultyVal = document.getElementById('edit-difficulty').value;
+            card.stability = stabilityVal !== '' ? parseFloat(stabilityVal) : undefined;
+            card.difficulty = difficultyVal !== '' ? clampDifficulty(parseFloat(difficultyVal)) : undefined;
+            card.state = document.getElementById('edit-state').value;
+            const dateVal = document.getElementById('edit-next-date').value;
+            if (dateVal) card.nextReviewDate = new Date(dateVal).toISOString();
             await saveData();
             hideEditModal();
             showFolderCards(currentFolderId);
@@ -1447,7 +1001,7 @@
             showCurrentCard();
         }
 
-        // ==================== ДОБАВЛЕНИЕ / ИМПОРТ / ЭКСПОРТ ====================
+        // ==================== ДОБАВЛЕНИЕ / ИМПОРТ ====================
         function showAddCardModal() {
             document.getElementById('new-english').value = '';
             document.getElementById('new-russian').value = '';
@@ -1464,17 +1018,7 @@
             const english = document.getElementById('new-english').value.trim();
             const russian = document.getElementById('new-russian').value.trim();
             if (!english || !russian) return alert('Заполните оба поля');
-
             const folder = getCurrentFolder();
-            const exists = folder.cards.some(c =>
-                c.english.toLowerCase() === english.toLowerCase() &&
-                c.russian.toLowerCase() === russian.toLowerCase()
-            );
-            if (exists) {
-                alert('Такая карточка уже есть в этой колоде');
-                return;
-            }
-
             folder.cards.push({
                 id: 'card_' + Date.now(),
                 english, russian,
@@ -1508,26 +1052,35 @@
             text.split('\n').forEach(line => {
                 const parts = line.split(/[-–—:]/).map(p => p.trim());
                 if (parts.length >= 2) {
-                    const exists = folder.cards.some(c =>
-                        c.english.toLowerCase() === parts[0].toLowerCase() &&
-                        c.russian.toLowerCase() === parts[1].toLowerCase()
-                    );
-                    if (!exists) {
-                        folder.cards.push({
-                            id: 'card_' + Date.now() + Math.random(),
-                            english: parts[0],
-                            russian: parts[1],
-                            image: null,
-                            ...makeFreshCardProgress()
-                        });
-                        count++;
-                    }
+                    folder.cards.push({
+                        id: 'card_' + Date.now() + Math.random(),
+                        english: parts[0],
+                        russian: parts[1],
+                        image: null,
+                        ...makeFreshCardProgress()
+                    });
+                    count++;
                 }
             });
             await saveData();
             hideImportModal();
-            alert(`Импортировано ${count} слов (дубликаты пропущены)`);
+            alert(`Импортировано ${count} слов`);
             showFolderCards(currentFolderId);
+        }
+
+        function editCardFromSearch(folderId, cardId) {
+            currentFolderId = folderId;
+            editCard(cardId);
+        }
+
+        // ==================== ЭКСПОРТ ====================
+        function exportAllData() {
+            if (folders.length === 0) return alert('Нет данных для экспорта');
+            const data = JSON.stringify(folders, null, 2);
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([data], {type: 'application/json'}));
+            a.download = `vocabulary_backup_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
         }
 
         async function importFromFile() {
@@ -1545,14 +1098,8 @@
                     if (confirm('Заменить текущие данные или добавить колоды? (OK — заменить, Отмена — добавить)')) {
                         folders = imported;
                     } else {
-                        const existingIds = new Set(folders.map(f => f.id));
-                        imported.forEach(f => {
-                            if (!existingIds.has(f.id)) {
-                                folders.push(f);
-                            }
-                        });
+                        folders = folders.concat(imported);
                     }
-                    migrateData();
                     await saveData();
                     alert('Данные импортированы');
                     hideImportModal();
@@ -1562,15 +1109,6 @@
                 }
             };
             reader.readAsText(file);
-        }
-
-        function exportAllData() {
-            if (folders.length === 0) return alert('Нет данных для экспорта');
-            const data = JSON.stringify(folders, null, 2);
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob([data], {type: 'application/json'}));
-            a.download = `vocabulary_backup_${new Date().toISOString().slice(0,10)}.json`;
-            a.click();
         }
 
         // ==================== МЕНЮ ДЕЙСТВИЯ ====================
@@ -1670,9 +1208,132 @@
             showFoldersView();
         }
 
-        function editCardFromSearch(folderId, cardId) {
-            currentFolderId = folderId;
-            editCard(cardId);
+        // ==================== УЛУЧШЕННАЯ ОЗВУЧКА (Google TTS + SpeechSynthesis) ====================
+
+        // Определение языка (оставляем как есть)
+        function detectLanguage(text) {
+            if (/[а-яё]/i.test(text)) return 'ru';
+            return 'en';
+        }
+
+        // Кеш для аудио (опционально, закомментирован)
+        // const audioCache = new Map();
+
+        async function speakWord(text) {
+            if (!text) return;
+
+            const lang = detectLanguage(text);
+            // Явно указываем американский английский и русский
+            const langCode = lang === 'en' ? 'en-US' : 'ru-RU';
+
+            // 1. Пытаемся Google TTS (если есть интернет)
+            try {
+                const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${langCode}&client=tw-ob&q=${encodeURIComponent(text)}`;
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 секунд таймаут
+
+                const response = await fetch(url, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                        'Referer': 'https://translate.google.com/',
+                    },
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const audioUrl = URL.createObjectURL(blob);
+                    // audioCache.set(text, audioUrl); // раскомментировать для кеширования
+                    const audio = new Audio(audioUrl);
+                    audio.play();
+                    audio.onended = () => URL.revokeObjectURL(audioUrl);
+                    return; // успешно
+                } else {
+                    throw new Error(`Google TTS ответил с ошибкой ${response.status}`);
+                }
+            } catch (error) {
+                console.warn('Google TTS не сработал, переключаемся на speechSynthesis:', error.message);
+                // 2. Fallback на встроенный синтезатор
+                await fallbackSpeak(text, lang);
+            }
+        }
+
+        // ========== FALLBACK С ПРАВИЛЬНЫМ ВЫБОРОМ ГОЛОСА ==========
+
+        async function fallbackSpeak(text, lang) {
+            if (!window.speechSynthesis) return;
+            window.speechSynthesis.cancel(); // отменяем предыдущую речь
+
+            const voices = await loadVoices(); // загружаем голоса
+            const langCode = lang === 'en' ? 'en-US' : 'ru-RU';
+
+            let voice = null;
+            if (voices.length > 0) {
+                // 1. Точное совпадение (en-US, ru-RU)
+                voice = voices.find(v => v.lang === langCode);
+                // 2. По началу кода (en, ru)
+                if (!voice) voice = voices.find(v => v.lang.startsWith(lang));
+                // 3. По наличию языка в названии (запасной вариант)
+                if (!voice) voice = voices.find(v => v.lang.includes(lang));
+                // 4. Крайний случай – берём первый голос
+                if (!voice) voice = voices[0];
+            }
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            if (voice) utterance.voice = voice;
+            utterance.lang = langCode;
+            utterance.rate = 0.9;   // комфортная скорость
+            utterance.pitch = 1;
+            utterance.volume = 1;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // ========== ЗАГРУЗКА ГОЛОСОВ С ТАЙМАУТОМ ==========
+
+        let voicesLoaded = false;
+        let voicesList = [];
+
+        function loadVoices() {
+            return new Promise((resolve) => {
+                if (voicesLoaded && voicesList.length > 0) {
+                    resolve(voicesList);
+                    return;
+                }
+                if (!window.speechSynthesis) {
+                    resolve([]);
+                    return;
+                }
+                // Сначала пробуем получить сразу (если уже загружены)
+                let voices = window.speechSynthesis.getVoices();
+                if (voices && voices.length > 0) {
+                    voicesList = voices;
+                    voicesLoaded = true;
+                    resolve(voicesList);
+                    return;
+                }
+                // Иначе ждём событие onvoiceschanged
+                const onVoicesChanged = () => {
+                    voicesList = window.speechSynthesis.getVoices();
+                    voicesLoaded = true;
+                    resolve(voicesList);
+                    window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
+                };
+                window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged);
+
+                // Таймаут на случай, если событие не сработает (Safari, старые браузеры)
+                setTimeout(() => {
+                    if (!voicesLoaded) {
+                        const v = window.speechSynthesis.getVoices();
+                        if (v && v.length > 0) {
+                            voicesList = v;
+                            voicesLoaded = true;
+                        }
+                        resolve(voicesList);
+                        window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
+                    }
+                }, 1000);
+            });
         }
 
         // ==================== PWA ====================
