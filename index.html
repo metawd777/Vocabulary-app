@@ -94,6 +94,23 @@
 
         .study-card .speak-btn { color: #0d9488; font-size: 1.5rem; margin-top: 4px; background: none; border: none; cursor: pointer; }
 
+        @keyframes cardEnter {
+            from { opacity: 0; transform: translateY(16px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .card-enter { animation: cardEnter 0.28s cubic-bezier(0.16,1,0.3,1); }
+
+        @keyframes flipPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+            100% { transform: scale(1); }
+        }
+        .flip-pulse { animation: flipPulse 0.22s ease; }
+
+        .progress-bar-track { height:8px; background:#e2e8f0; border-radius:9999px; overflow:hidden; }
+        .dark .progress-bar-track { background:#334155; }
+        .progress-bar-fill { height:100%; background:#0d9488; border-radius:9999px; transition: width 0.35s cubic-bezier(0.16,1,0.3,1); }
+
         .rating-buttons { flex-shrink:0; padding-top:12px; padding-bottom:12px; display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
         .rating-btn { padding:12px 0; border-radius:16px; font-weight:500; font-size:1rem; text-align:center; transition:transform 0.1s; border:none; cursor:pointer; }
         .rating-btn:active { transform:scale(0.95); }
@@ -142,17 +159,17 @@
     <!-- Нижняя навигация -->
     <div class="bottom-nav max-w-3xl mx-auto w-full">
         <div class="grid grid-cols-4 text-center py-1 text-xs">
-            <button onclick="showFoldersView()" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target">
+            <button onclick="showFoldersView()" id="nav-folders" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target">
                 <i class="fa-solid fa-folder text-xl mb-0.5"></i><span>Колоды</span>
             </button>
-            <button onclick="startStudy()" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target">
+            <button onclick="startStudy()" id="nav-study" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target">
                 <i class="fa-solid fa-graduation-cap text-xl mb-0.5"></i><span>Учить</span>
             </button>
-            <button onclick="showImportModal()" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target">
-                <i class="fa-solid fa-file-import text-xl mb-0.5"></i><span>Импорт</span>
+            <button onclick="showStatsView()" id="nav-stats" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target">
+                <i class="fa-solid fa-chart-simple text-xl mb-0.5"></i><span>Статистика</span>
             </button>
-            <button onclick="showManagementMenu()" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target">
-                <i class="fa-solid fa-ellipsis-v text-xl mb-0.5"></i><span>Действия</span>
+            <button onclick="showSettingsView()" id="nav-settings" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target">
+                <i class="fa-solid fa-gear text-xl mb-0.5"></i><span>Настройки</span>
             </button>
         </div>
     </div>
@@ -225,47 +242,14 @@
         </div>
     </div>
 
-    <!-- Модалка импорта -->
-    <div id="importModal" onclick="hideImportModal()" class="hidden fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]">
-        <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
-            <div class="font-semibold text-xl mb-4">Импорт слов</div>
-            <div class="mb-3"><label class="block text-sm mb-1">Колода</label><select id="import-folder-select" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 touch-target"></select></div>
-            <textarea id="import-text" placeholder="beautiful - красивый&#10;hello - привет" class="w-full h-32 p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 font-mono text-sm"></textarea>
-            <div class="flex gap-3 mt-3">
-                <button onclick="hideImportModal()" class="flex-1 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-base touch-target">Отмена</button>
-                <button onclick="importWords()" class="flex-1 py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target">Импорт</button>
-            </div>
-            <hr class="my-3 border-slate-200 dark:border-slate-700">
-            <div class="font-semibold text-base mb-2">Импорт из файла</div>
-            <input type="file" id="import-file-input" accept=".json" class="w-full text-sm touch-target">
-            <button onclick="importFromFile()" class="w-full mt-2 py-3 rounded-xl bg-indigo-600 text-white font-medium text-base touch-target">Загрузить</button>
-        </div>
-    </div>
-
-    <!-- Модалка действий -->
-    <div id="managementModal" onclick="hideManagementMenu()" class="hidden fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]">
-        <div onclick="event.stopImmediatePropagation()" class="relative bg-white dark:bg-slate-800 w-full sm:w-[380px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
-            <button onclick="hideManagementMenu()" aria-label="Закрыть" class="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 touch-target">
-                <i class="fa-solid fa-xmark text-lg"></i>
-            </button>
-            <div class="font-semibold text-xl mb-4 pr-8">Действия</div>
-            <div class="space-y-2">
-                <button onclick="createFolder(); hideManagementMenu()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
-                    <i class="fa-solid fa-plus w-5 text-teal-600"></i> <span>Создать колоду</span>
-                </button>
-                <button onclick="exportAllData(); hideManagementMenu()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
-                    <i class="fa-solid fa-file-export w-5 text-teal-600"></i> <span>Экспорт всех данных</span>
-                </button>
-                <button onclick="showResetFolderSelectionModal(); hideManagementMenu()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
-                    <i class="fa-solid fa-undo w-5 text-amber-500"></i> <span>Сбросить прогресс выбранной колоды</span>
-                </button>
-                <button onclick="resetAllProgress(); hideManagementMenu()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
-                    <i class="fa-solid fa-xmark w-5 text-slate-800 dark:text-slate-200"></i> <span>Сбросить прогресс всех колод</span>
-                </button>
-                <button onclick="hideManagementMenu(); showDeleteFolderModal()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-red-600 text-base touch-target">
-                    <i class="fa-solid fa-trash w-5"></i> <span>Удалить колоду</span>
-                </button>
-            </div>
+    <!-- Модалка достижения -->
+    <div id="achievementModal" class="hidden fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]">
+        <div class="bg-white dark:bg-slate-800 w-full sm:w-[380px] rounded-t-3xl sm:rounded-3xl p-6 text-center">
+            <div id="achievement-icon" class="w-20 h-20 mx-auto rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-4xl mb-3">🏆</div>
+            <div class="text-sm text-amber-600 dark:text-amber-400 font-medium mb-1">Новое достижение!</div>
+            <div id="achievement-title" class="text-xl font-semibold mb-1"></div>
+            <div id="achievement-desc" class="text-sm text-slate-500 dark:text-slate-400 mb-4"></div>
+            <button onclick="hideAchievementModal()" class="w-full py-3 rounded-2xl bg-teal-600 text-white font-medium text-base touch-target">Отлично!</button>
         </div>
     </div>
 
@@ -289,6 +273,7 @@
         let initialDueCount = 0;
         let editingCardId = null;
         let viewingCardId = null;
+        let stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0 };
 
         // ==================== ХРАНЕНИЕ ====================
         async function loadData() {
@@ -318,6 +303,351 @@
             }
         }
 
+        async function loadStats() {
+            try {
+                const stored = await localforage.getItem('stats');
+                if (stored && typeof stored === 'object') {
+                    stats = {
+                        studyDates: stored.studyDates || [],
+                        unlocked: stored.unlocked || {},
+                        dailyStats: stored.dailyStats || {},
+                        consecutiveCorrect: stored.consecutiveCorrect || 0,
+                        maxConsecutiveCorrect: stored.maxConsecutiveCorrect || 0,
+                        totalFlips: stored.totalFlips || 0,
+                        totalImages: stored.totalImages || 0
+                    };
+                }
+            } catch (e) {
+                console.warn('Ошибка загрузки статистики', e);
+            }
+        }
+
+        async function saveStats() {
+            try {
+                await localforage.setItem('stats', stats);
+            } catch (e) {
+                console.error('Ошибка сохранения статистики:', e);
+            }
+        }
+
+        // ==================== ХЕЛПЕРЫ ДЛЯ СТАТИСТИКИ ====================
+        function localDateKey(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        async function recordStudyActivity() {
+            const key = localDateKey(new Date());
+            if (!stats.studyDates.includes(key)) {
+                stats.studyDates.push(key);
+                await saveStats();
+            }
+        }
+
+        function currentStreak() {
+            if (!stats.studyDates || stats.studyDates.length === 0) return 0;
+            const daySet = new Set(stats.studyDates);
+            let streak = 0;
+            let cursor = new Date();
+            if (!daySet.has(localDateKey(cursor))) {
+                cursor = addDays(cursor, -1);
+            }
+            while (daySet.has(localDateKey(cursor))) {
+                streak++;
+                cursor = addDays(cursor, -1);
+            }
+            return streak;
+        }
+
+        function getTodayStats() {
+            const key = localDateKey(new Date());
+            return stats.dailyStats?.[key] || null;
+        }
+
+        // ==================== ТРЕКИНГ АКТИВНОСТИ ====================
+        async function recordReviewOutcome(grade) {
+            const key = localDateKey(new Date());
+            if (!stats.dailyStats) stats.dailyStats = {};
+            if (!stats.dailyStats[key]) {
+                stats.dailyStats[key] = { total: 0, correct: 0, grades: [], usedAllGrades: false };
+            }
+            const today = stats.dailyStats[key];
+            today.total++;
+            if (grade >= 3) {
+                today.correct++;
+                stats.consecutiveCorrect++;
+                if (stats.consecutiveCorrect > stats.maxConsecutiveCorrect) {
+                    stats.maxConsecutiveCorrect = stats.consecutiveCorrect;
+                }
+            } else {
+                stats.consecutiveCorrect = 0;
+            }
+            if (!today.grades.includes(grade)) {
+                today.grades.push(grade);
+                if (today.grades.length === 4) today.usedAllGrades = true;
+            }
+            await saveStats();
+        }
+
+        async function recordFlip() {
+            stats.totalFlips = (stats.totalFlips || 0) + 1;
+            await saveStats();
+        }
+
+        async function recordPhotoAdded() {
+            stats.totalImages = (stats.totalImages || 0) + 1;
+            await saveStats();
+        }
+
+        // ==================== ВЫЧИСЛЕНИЕ ГЛОБАЛЬНОЙ СТАТИСТИКИ ====================
+        function computeGlobalStats() {
+            let total = 0, statNew = 0, statLearning = 0, statReview = 0, statRelearning = 0;
+            let totalReps = 0, totalLapses = 0, stabilitySum = 0, stabilityCount = 0;
+            let totalImages = stats.totalImages || 0;
+            let totalFlips = stats.totalFlips || 0;
+            let maxConsecutiveCorrect = stats.maxConsecutiveCorrect || 0;
+
+            folders.forEach(f => f.cards.forEach(c => {
+                total++;
+                if (c.state === 'learning') statLearning++;
+                else if (c.state === 'review') statReview++;
+                else if (c.state === 'relearning') statRelearning++;
+                else statNew++;
+                totalReps += c.reps || 0;
+                totalLapses += c.lapses || 0;
+                if (typeof c.stability === 'number') { stabilitySum += c.stability; stabilityCount++; }
+            }));
+            const percentCorrect = totalReps > 0 ? Math.max(0, Math.round((1 - totalLapses / totalReps) * 100)) : null;
+            const avgStability = stabilityCount > 0 ? (stabilitySum / stabilityCount) : null;
+            const learnedCount = statReview + statRelearning;
+            const todayStats = getTodayStats();
+
+            return { total, statNew, statLearning, statReview, statRelearning, totalReps, totalLapses, percentCorrect, avgStability, learnedCount, totalImages, totalFlips, maxConsecutiveCorrect, todayStats };
+        }
+
+        // ==================== ДОСТИЖЕНИЯ (27 шт.) ====================
+        const ACHIEVEMENTS = [
+            // === ОБЪЁМ (прогрессивный) ===
+            { id: 'first_step', icon: '🌱', title: 'Первый шаг', desc: 'Выучить 1 слово (довести до «На повторении»)',
+                category: 'Объём', check: (g) => g.learnedCount >= 1 },
+            { id: 'novice', icon: '📗', title: 'Новичок', desc: '10 слов на повторении',
+                category: 'Объём', check: (g) => g.learnedCount >= 10 },
+            { id: 'student', icon: '📘', title: 'Ученик', desc: '50 слов на повторении',
+                category: 'Объём', check: (g) => g.learnedCount >= 50 },
+            { id: 'master', icon: '📙', title: 'Знаток', desc: '100 слов на повторении',
+                category: 'Объём', check: (g) => g.learnedCount >= 100 },
+            { id: 'polyglot', icon: '🌍', title: 'Полиглот', desc: '200 слов на повторении',
+                category: 'Объём', check: (g) => g.learnedCount >= 200 },
+            { id: 'erudite', icon: '🧠', title: 'Эрудит', desc: '500 слов на повторении',
+                category: 'Объём', check: (g) => g.learnedCount >= 500 },
+            { id: 'language_master', icon: '👑', title: 'Мастер языка', desc: '1000 слов на повторении',
+                category: 'Объём', check: (g) => g.learnedCount >= 1000 },
+            { id: 'lexicon', icon: '📚', title: 'Лексикон', desc: '2000 слов на повторении',
+                category: 'Объём', check: (g) => g.learnedCount >= 2000 },
+
+            // === СЕРИЯ ДНЕЙ (стрик) ===
+            { id: 'enthusiast', icon: '🔥', title: 'Энтузиаст', desc: '7 дней подряд занятий',
+                category: 'Серия дней', check: (g, streak) => streak >= 7 },
+            { id: 'persistent', icon: '💪', title: 'Упорный', desc: '30 дней подряд занятий',
+                category: 'Серия дней', check: (g, streak) => streak >= 30 },
+            { id: 'dedicated', icon: '🗓️', title: 'Преданный', desc: '60 дней подряд занятий',
+                category: 'Серия дней', check: (g, streak) => streak >= 60 },
+            { id: 'legendary', icon: '🏰', title: 'Легенда', desc: '100 дней подряд занятий',
+                category: 'Серия дней', check: (g, streak) => streak >= 100 },
+            { id: 'immortal', icon: '🕊️', title: 'Бессмертный', desc: '365 дней подряд занятий',
+                category: 'Серия дней', check: (g, streak) => streak >= 365 },
+
+            // === ТОЧНОСТЬ (серии правильных ответов) ===
+            { id: 'stable', icon: '🎯', title: 'Стабильный', desc: '10 правильных ответов подряд',
+                category: 'Точность', check: (g) => g.maxConsecutiveCorrect >= 10 },
+            { id: 'sniper', icon: '🔫', title: 'Снайпер', desc: '50 правильных ответов подряд',
+                category: 'Точность', check: (g) => g.maxConsecutiveCorrect >= 50 },
+            { id: 'accuracy_master', icon: '💎', title: 'Мастер точности', desc: '100 правильных ответов подряд',
+                category: 'Точность', check: (g) => g.maxConsecutiveCorrect >= 100 },
+
+            // === ИНТЕНСИВНОСТЬ (повторения за день) ===
+            { id: 'sprinter', icon: '🏃', title: 'Спринтер', desc: '20 повторений за один день',
+                category: 'Интенсивность', check: (g, streak, foldersCount, today) => today && today.total >= 20 },
+            { id: 'marathoner', icon: '🏅', title: 'Марафонец', desc: '50 повторений за один день',
+                category: 'Интенсивность', check: (g, streak, foldersCount, today) => today && today.total >= 50 },
+            { id: 'ultra_marathoner', icon: '⚡', title: 'Ультрамарафонец', desc: '100 повторений за один день',
+                category: 'Интенсивность', check: (g, streak, foldersCount, today) => today && today.total >= 100 },
+
+            // === КОНТЕНТ (колоды, фото, оценки) ===
+            { id: 'deck_collector', icon: '🗂️', title: 'Собиратель колод', desc: 'Создать 5 колод',
+                category: 'Контент', check: (g, streak, foldersCount) => foldersCount >= 5 },
+            { id: 'architect', icon: '🏗️', title: 'Архитектор', desc: 'Создать 10 колод',
+                category: 'Контент', check: (g, streak, foldersCount) => foldersCount >= 10 },
+            { id: 'photographer', icon: '📸', title: 'Фотограф', desc: 'Добавить 10 изображений к карточкам',
+                category: 'Контент', check: (g) => g.totalImages >= 10 },
+            { id: 'researcher', icon: '🔬', title: 'Исследователь', desc: 'Использовать все 4 типа оценки за день',
+                category: 'Контент', check: (g, streak, foldersCount, today) => today && today.usedAllGrades === true },
+
+            // === АКТИВНОСТЬ (повторения, перевороты) ===
+            { id: 'rep_master', icon: '⚡', title: 'Мастер повторений', desc: '1000 повторений карточек',
+                category: 'Активность', check: (g) => g.totalReps >= 1000 },
+            { id: 'rep_legend', icon: '💫', title: 'Легенда повторений', desc: '5000 повторений карточек',
+                category: 'Активность', check: (g) => g.totalReps >= 5000 },
+            { id: 'flip_master', icon: '🔄', title: 'Мастер переворота', desc: '500 переворотов карточки',
+                category: 'Активность', check: (g) => g.totalFlips >= 500 },
+
+            // === СПЕЦИАЛЬНЫЕ ===
+            { id: 'perfect_day', icon: '⭐', title: 'Идеальный день', desc: '100% правильных ответов за день (минимум 10 карточек)',
+                category: 'Особые', check: (g, streak, foldersCount, today) => today && today.total >= 10 && today.correct === today.total }
+        ];
+
+        // ==================== ПРОВЕРКА И ОТОБРАЖЕНИЕ ДОСТИЖЕНИЙ ====================
+        let achievementQueue = [];
+
+        async function checkAchievements() {
+            const g = computeGlobalStats();
+            const streak = currentStreak();
+            const todayStats = getTodayStats();
+            const newlyUnlocked = [];
+
+            ACHIEVEMENTS.forEach(a => {
+                if (!stats.unlocked[a.id] && a.check(g, streak, folders.length, todayStats)) {
+                    stats.unlocked[a.id] = true;
+                    newlyUnlocked.push(a);
+                }
+            });
+
+            if (newlyUnlocked.length > 0) {
+                await saveStats();
+                showAchievementQueue(newlyUnlocked);
+            }
+        }
+
+        function showAchievementQueue(list) {
+            achievementQueue = achievementQueue.concat(list);
+            if (achievementQueue.length === list.length) showNextAchievement();
+        }
+
+        function showNextAchievement() {
+            if (achievementQueue.length === 0) return;
+            const a = achievementQueue[0];
+            document.getElementById('achievement-icon').textContent = a.icon;
+            document.getElementById('achievement-title').textContent = a.title;
+            document.getElementById('achievement-desc').textContent = a.desc;
+            document.getElementById('achievementModal').classList.remove('hidden');
+            document.getElementById('achievementModal').classList.add('flex');
+        }
+
+        function hideAchievementModal() {
+            document.getElementById('achievementModal').classList.add('hidden');
+            document.getElementById('achievementModal').classList.remove('flex');
+            achievementQueue.shift();
+            if (achievementQueue.length > 0) setTimeout(showNextAchievement, 250);
+        }
+
+        // ==================== ОТОБРАЖЕНИЕ СТАТИСТИКИ ====================
+        function showStatsView() {
+            document.getElementById('current-folder-name').textContent = 'Статистика';
+            const g = computeGlobalStats();
+            const streak = currentStreak();
+            const today = getTodayStats();
+            const container = document.getElementById('main-content');
+
+            const categories = {};
+            ACHIEVEMENTS.forEach(a => {
+                if (!categories[a.category]) categories[a.category] = [];
+                categories[a.category].push(a);
+            });
+            const categoryOrder = ['Объём', 'Серия дней', 'Точность', 'Интенсивность', 'Контент', 'Активность', 'Особые'];
+
+            let achievementsHtml = '';
+            categoryOrder.forEach(cat => {
+                if (!categories[cat]) return;
+                achievementsHtml += `<div class="font-semibold text-sm mt-3 mb-2 text-slate-600 dark:text-slate-400">${cat}</div>`;
+                categories[cat].forEach(a => {
+                    const unlocked = !!stats.unlocked[a.id];
+                    achievementsHtml += `
+                        <div class="flex items-center gap-x-3 px-3 py-2 rounded-2xl ${unlocked ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-slate-50 dark:bg-slate-900/40 opacity-60'}">
+                            <div class="text-2xl">${unlocked ? a.icon : '🔒'}</div>
+                            <div class="flex-1">
+                                <div class="font-medium text-sm">${a.title}</div>
+                                <div class="text-xs text-slate-500 dark:text-slate-400">${a.desc}</div>
+                            </div>
+                        </div>`;
+                });
+            });
+
+            container.innerHTML = `
+                <div class="scrollable-content px-1 pt-2 pb-4">
+                    <h2 class="text-xl font-semibold mb-3">Статистика</h2>
+
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 text-center">
+                            <div class="text-3xl font-bold text-teal-600">${g.total}</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">всего слов</div>
+                        </div>
+                        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 text-center">
+                            <div class="text-3xl font-bold text-orange-500">🔥 ${streak}</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">дней подряд</div>
+                        </div>
+                        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 text-center">
+                            <div class="text-3xl font-bold text-emerald-500">${g.percentCorrect !== null ? g.percentCorrect + '%' : '—'}</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">верных ответов</div>
+                        </div>
+                        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 text-center">
+                            <div class="text-3xl font-bold text-indigo-500">${g.avgStability !== null ? g.avgStability.toFixed(1) : '—'}</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">сред. стабильность</div>
+                        </div>
+                        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 text-center">
+                            <div class="text-3xl font-bold text-purple-500">${g.maxConsecutiveCorrect}</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">макс. серия</div>
+                        </div>
+                        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 text-center">
+                            <div class="text-3xl font-bold text-rose-500">${today ? today.total : 0}</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">повторений сегодня</div>
+                        </div>
+                        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 text-center">
+                            <div class="text-3xl font-bold text-blue-500">${g.totalFlips || 0}</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">переворотов</div>
+                        </div>
+                        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 text-center">
+                            <div class="text-3xl font-bold text-amber-500">${g.totalImages}</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">фото</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 mb-3">
+                        <div class="font-semibold text-base mb-3">По статусу</div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Новые</span><span class="font-medium">${g.statNew}</span></div>
+                            <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Изучаются</span><span class="font-medium">${g.statLearning}</span></div>
+                            <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">На повторении</span><span class="font-medium">${g.statReview}</span></div>
+                            <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Переучиваются</span><span class="font-medium">${g.statRelearning}</span></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4">
+                        <div class="font-semibold text-base mb-3">Достижения</div>
+                        ${achievementsHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== БЕЗОПАСНЫЙ ВЫВОД ТЕКСТА ====================
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function escJs(str) {
+            if (str === null || str === undefined) return '';
+            return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        }
+
+        // ==================== ОСТАЛЬНЫЕ ФУНКЦИИ ====================
         function getCurrentFolder() {
             return folders.find(f => f.id === currentFolderId) || folders[0];
         }
@@ -517,6 +847,8 @@
             const compressed = await compressImage(file);
             card.image = compressed;
             await saveData();
+            await recordPhotoAdded();
+            await checkAchievements();
         }
 
         // ==================== ТЕМА ====================
@@ -605,7 +937,7 @@
                                 <div onclick="selectFolder('${f.id}')" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 cursor-pointer touch-target">
                                     <div class="flex justify-between items-center">
                                         <div>
-                                            <div class="font-semibold text-lg">${f.name}</div>
+                                            <div class="font-semibold text-lg">${escapeHtml(f.name)}</div>
                                             <div class="text-sm text-slate-500 dark:text-slate-400">${f.cards.length} слов</div>
                                         </div>
                                         <div class="flex items-center gap-x-3">
@@ -627,8 +959,8 @@
                     : `<div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl overflow-hidden">` + 
                       results.map(card => `
                         <div onclick="editCardFromSearch('${card.folderId}', '${card.id}')" class="flex justify-between items-center px-4 py-3 border-b border-slate-100 dark:border-slate-800 last:border-b-0 cursor-pointer touch-target">
-                            <div><span class="font-medium">${card.english}</span> <span class="mx-2 text-slate-400">—</span> <span class="text-slate-600 dark:text-slate-300">${card.russian}</span></div>
-                            <div class="text-xs text-teal-600 dark:text-teal-400">${card.folderName}</div>
+                            <div><span class="font-medium">${escapeHtml(card.english)}</span> <span class="mx-2 text-slate-400">—</span> <span class="text-slate-600 dark:text-slate-300">${escapeHtml(card.russian)}</span></div>
+                            <div class="text-xs text-teal-600 dark:text-teal-400">${escapeHtml(card.folderName)}</div>
                         </div>
                       `).join('') + `</div>`;
             }
@@ -649,6 +981,7 @@
             folders.push({ id: 'folder_' + Date.now(), name: name.trim(), cards: [] });
             await saveData();
             showFoldersView();
+            await checkAchievements();
         }
 
         function showRenameFolderModal(folderId) {
@@ -662,7 +995,7 @@
                     <div class="font-semibold text-xl mb-4">Переименовать колоду</div>
                     <div class="mb-4">
                         <label class="block text-sm mb-1">Новое название</label>
-                        <input type="text" id="rename-input" value="${folder.name}" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-base touch-target">
+                        <input type="text" id="rename-input" value="${escapeHtml(folder.name)}" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-base touch-target">
                     </div>
                     <div class="flex gap-3">
                         <button onclick="this.closest('.fixed').remove()" class="flex-1 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-base touch-target">Отмена</button>
@@ -702,9 +1035,9 @@
                         folder.cards.map(card => `
                             <div onclick="viewCard('${card.id}')" class="flex items-center px-4 py-3 border-b border-slate-100 dark:border-slate-800 last:border-b-0 cursor-pointer touch-target">
                                 <div class="flex-1">
-                                    <span class="font-medium">${card.english}</span>
+                                    <span class="font-medium">${escapeHtml(card.english)}</span>
                                     <span class="mx-2 text-slate-400">—</span>
-                                    <span class="text-slate-600 dark:text-slate-300">${card.russian}</span>
+                                    <span class="text-slate-600 dark:text-slate-300">${escapeHtml(card.russian)}</span>
                                 </div>
                                 <button onclick="event.stopImmediatePropagation(); uploadImageForCard('${card.id}')" class="ml-2 text-xl text-slate-400 hover:text-teal-600 touch-target"><i class="fa-solid fa-camera"></i></button>
                             </div>
@@ -779,9 +1112,12 @@
                 const total = initialDueCount;
                 const percent = Math.round((done / total) * 100);
                 progressHtml = `
-                    <div class="progress-area flex justify-between items-center px-1">
-                        <span>Выполнено <b>${done}</b> из <b>${total}</b></span>
-                        <span class="text-teal-600 font-semibold">${percent}%</span>
+                    <div class="progress-area px-1 mb-1">
+                        <div class="flex justify-between items-center mb-1">
+                            <span>Выполнено <b>${done}</b> из <b>${total}</b></span>
+                            <span class="text-teal-600 font-semibold">${percent}%</span>
+                        </div>
+                        <div class="progress-bar-track"><div class="progress-bar-fill" style="width:${percent}%"></div></div>
                     </div>
                 `;
             }
@@ -801,13 +1137,13 @@
                 <div class="study-container">
                     ${progressHtml}
                     <div class="study-card-wrapper">
-                        <div class="study-card" onclick="flipStudyCard()">
+                        <div class="study-card card-enter" onclick="flipStudyCard()">
                             ${imageHtml}
                             <div id="card-front">
-                                <div class="word-english">${card.english}</div>
+                                <div class="word-english">${escapeHtml(card.english)}</div>
                             </div>
                             <div id="card-back" class="hidden">
-                                <div class="word-russian">${card.russian}</div>
+                                <div class="word-russian">${escapeHtml(card.russian)}</div>
                             </div>
                             <!-- ЕДИНАЯ КНОПКА ОЗВУЧКИ -->
                             <button onclick="event.stopImmediatePropagation(); speakCurrentWord()" class="speak-btn">
@@ -854,9 +1190,9 @@
             const content = document.getElementById('card-view-content');
             content.innerHTML = `
                 <div class="study-card" style="cursor:default; min-height:200px;">
-                    <div class="word-english">${card.english}</div>
-                    <div class="word-russian mt-2">${card.russian}</div>
-                    <button onclick="event.stopImmediatePropagation(); speakWord('${card.english}'); speakWord('${card.russian}')" class="speak-btn">
+                    <div class="word-english">${escapeHtml(card.english)}</div>
+                    <div class="word-russian mt-2">${escapeHtml(card.russian)}</div>
+                    <button onclick="event.stopImmediatePropagation(); speakWord('${escJs(card.english)}'); speakWord('${escJs(card.russian)}')" class="speak-btn">
                         <i class="fa-solid fa-volume-up"></i>
                     </button>
                     ${card.image ? `<img src="${card.image}" class="max-h-48 mx-auto rounded-2xl mt-4">` : ''}
@@ -873,13 +1209,40 @@
             if (!front || !back) return;
             front.classList.toggle('hidden');
             back.classList.toggle('hidden');
+            const cardEl = document.querySelector('.study-card');
+            if (cardEl) {
+                cardEl.classList.remove('flip-pulse');
+                void cardEl.offsetWidth;
+                cardEl.classList.add('flip-pulse');
+            }
+            recordFlip();
         }
 
         async function rateCard(grade) {
             const card = dueCards[currentCardIndex];
             await updateCardAfterReview(card, grade);
+            await recordStudyActivity();
+            await recordReviewOutcome(grade);
+
+            const cardEl = document.querySelector('.study-card');
+            const flashClasses = {
+                1: 'ring-4 ring-red-400',
+                2: 'ring-4 ring-orange-400',
+                3: 'ring-4 ring-emerald-400',
+                4: 'ring-4 ring-teal-400'
+            };
+            if (cardEl) {
+                cardEl.classList.add(...flashClasses[grade].split(' '));
+                cardEl.style.transition = 'opacity 0.18s ease, transform 0.18s ease';
+                await new Promise(r => setTimeout(r, 140));
+                cardEl.style.opacity = '0';
+                cardEl.style.transform = 'translateY(-10px)';
+                await new Promise(r => setTimeout(r, 140));
+            }
+
             currentCardIndex++;
             showCurrentCard();
+            await checkAchievements();
         }
 
         async function resetCurrentCard() {
@@ -1049,19 +1412,6 @@
             showFolderCards(currentFolderId);
         }
 
-        function showImportModal() {
-            const modal = document.getElementById('importModal');
-            const select = document.getElementById('import-folder-select');
-            select.innerHTML = folders.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-
-        function hideImportModal() {
-            document.getElementById('importModal').classList.add('hidden');
-            document.getElementById('importModal').classList.remove('flex');
-        }
-
         async function importWords() {
             const text = document.getElementById('import-text').value.trim();
             const folderId = document.getElementById('import-folder-select').value;
@@ -1082,9 +1432,10 @@
                 }
             });
             await saveData();
-            hideImportModal();
+            document.getElementById('import-text').value = '';
             alert(`Импортировано ${count} слов`);
-            showFolderCards(currentFolderId);
+            showFolderCards(folderId);
+            await checkAchievements();
         }
 
         function editCardFromSearch(folderId, cardId) {
@@ -1121,8 +1472,8 @@
                     }
                     await saveData();
                     alert('Данные импортированы');
-                    hideImportModal();
                     showFoldersView();
+                    await checkAchievements();
                 } catch (err) {
                     alert('Ошибка импорта: ' + err.message);
                 }
@@ -1130,15 +1481,90 @@
             reader.readAsText(file);
         }
 
-        // ==================== МЕНЮ ДЕЙСТВИЯ ====================
-        function showManagementMenu() {
-            document.getElementById('managementModal').classList.remove('hidden');
-            document.getElementById('managementModal').classList.add('flex');
+        // ==================== НАСТРОЙКИ ====================
+        function showSettingsView() {
+            document.getElementById('current-folder-name').textContent = 'Настройки';
+            const container = document.getElementById('main-content');
+            container.innerHTML = `
+                <div class="scrollable-content px-1 pt-2 pb-4">
+                    <h2 class="text-xl font-semibold mb-3">Настройки</h2>
+
+                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 mb-3">
+                        <div class="font-semibold text-base mb-3">Колоды</div>
+                        <button onclick="createFolder()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
+                            <i class="fa-solid fa-plus w-5 text-teal-600"></i> <span>Создать колоду</span>
+                        </button>
+                        <button onclick="showDeleteFolderModal()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-red-600 text-base touch-target">
+                            <i class="fa-solid fa-trash w-5"></i> <span>Удалить колоду</span>
+                        </button>
+                    </div>
+
+                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 mb-3">
+                        <div class="font-semibold text-base mb-3">Импорт слов (текстом)</div>
+                        <div class="mb-3"><label class="block text-sm mb-1">Колода</label>
+                            <select id="import-folder-select" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 touch-target">
+                                ${folders.map(f => `<option value="${f.id}" ${f.id === currentFolderId ? 'selected' : ''}>${escapeHtml(f.name)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <textarea id="import-text" placeholder="beautiful - красивый&#10;hello - привет" class="w-full h-28 p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 font-mono text-sm"></textarea>
+                        <button onclick="importWords()" class="w-full mt-3 py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target">Импортировать</button>
+                    </div>
+
+                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 mb-3">
+                        <div class="font-semibold text-base mb-3">Резервное копирование</div>
+                        <button onclick="exportAllData()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target mb-1">
+                            <i class="fa-solid fa-file-export w-5 text-teal-600"></i> <span>Экспорт всех данных</span>
+                        </button>
+                        <div class="text-sm mb-1 px-1">Импорт из файла (.json)</div>
+                        <input type="file" id="import-file-input" accept=".json" class="w-full text-sm touch-target px-1">
+                        <button onclick="importFromFile()" class="w-full mt-2 py-3 rounded-xl bg-indigo-600 text-white font-medium text-base touch-target">Загрузить</button>
+                    </div>
+
+                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 mb-3">
+                        <div class="font-semibold text-base mb-3">Сброс прогресса</div>
+                        <button onclick="showResetFolderSelectionModal()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
+                            <i class="fa-solid fa-undo w-5 text-amber-500"></i> <span>Сбросить прогресс выбранной колоды</span>
+                        </button>
+                        <button onclick="resetAllProgress()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
+                            <i class="fa-solid fa-xmark w-5 text-slate-800 dark:text-slate-200"></i> <span>Сбросить прогресс всех колод</span>
+                        </button>
+                    </div>
+
+                    <!-- НОВЫЙ БЛОК: СТАТИСТИКА И ДОСТИЖЕНИЯ -->
+                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4">
+                        <div class="font-semibold text-base mb-3">Статистика и достижения</div>
+                        <button onclick="resetAchievements()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
+                            <i class="fa-solid fa-trophy w-5 text-amber-500"></i> <span>Сбросить все достижения</span>
+                        </button>
+                        <button onclick="resetAllStats()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
+                            <i class="fa-solid fa-eraser w-5 text-red-500"></i> <span>Сбросить всю статистику и достижения</span>
+                        </button>
+                    </div>
+                </div>
+            `;
         }
 
-        function hideManagementMenu() {
-            document.getElementById('managementModal').classList.add('hidden');
-            document.getElementById('managementModal').classList.remove('flex');
+        // ==================== СБРОС СТАТИСТИКИ И ДОСТИЖЕНИЙ ====================
+        async function resetAchievements() {
+            if (!confirm('Сбросить все достижения? Вы сможете получить их заново. Статистика занятий останется.')) return;
+            stats.unlocked = {};
+            await saveStats();
+            if (document.getElementById('current-folder-name').textContent === 'Статистика') {
+                showStatsView();
+            } else {
+                alert('Достижения сброшены');
+            }
+        }
+
+        async function resetAllStats() {
+            if (!confirm('Сбросить всю статистику и достижения? Будут удалены все данные об активности, сериях, днях занятий, достижениях. Прогресс карточек не будет затронут.')) return;
+            stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0 };
+            await saveStats();
+            if (document.getElementById('current-folder-name').textContent === 'Статистика') {
+                showStatsView();
+            } else {
+                alert('Статистика и достижения сброшены');
+            }
         }
 
         // ==================== СБРОС ПРОГРЕССА ====================
@@ -1149,7 +1575,7 @@
             if (listContainer) {
                 listContainer.innerHTML = folders.map(f => `
                     <button onclick="resetSelectedFolderProgress('${f.id}'); hideResetFolderSelectionModal()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex justify-between items-center text-base touch-target">
-                        <span>${f.name}</span>
+                        <span>${escapeHtml(f.name)}</span>
                         <span class="text-xs text-slate-400">${f.cards.length} слов</span>
                     </button>
                 `).join('');
@@ -1205,7 +1631,7 @@
                     <div class="font-semibold text-xl mb-4">Выберите колоду для удаления</div>
                     ${folders.map(f => `
                         <button onclick="confirmDeleteFolder('${f.id}'); this.closest('.fixed').remove()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 flex justify-between mb-1 text-base touch-target">
-                            <span>${f.name}</span>
+                            <span>${escapeHtml(f.name)}</span>
                             <span class="text-xs text-slate-400">${f.cards.length} слов</span>
                         </button>
                     `).join('')}
@@ -1397,9 +1823,11 @@
         // ==================== ИНИЦИАЛИЗАЦИЯ ====================
         async function init() {
             await loadData();
+            await loadStats();
             initTheme();
             document.getElementById('current-folder-name').textContent = 'Мои колоды';
             showFoldersView();
+            await checkAchievements();
         }
 
         window.onload = init;
