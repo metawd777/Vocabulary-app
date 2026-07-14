@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-title" content="Vocabulary">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0f172a">
-    <title>Vocabulary • Финальная стабильная версия</title>
+    <title>Vocabulary • Финальная версия</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = { darkMode: 'class' };
@@ -17,7 +17,13 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        html, body { margin:0; padding:0; height:100%; overflow:hidden; font-family: system-ui, -apple-system, sans-serif; }
+        html, body {
+            margin:0;
+            padding:0;
+            height:100%;
+            overflow:hidden;
+            font-family: Georgia, 'Times New Roman', serif;
+        }
         body { background:#f1f5f9; color:#0f172a; display:flex; flex-direction:column; }
         .dark body { background:#0f172a; color:#f1f5f9; }
         ::-webkit-scrollbar { display:none; }
@@ -29,11 +35,39 @@
         .theme-btn { width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-radius:9999px; font-size:1.5rem; background:transparent; color:#64748b; transition:all 0.2s; border:none; cursor:pointer; }
         .dark .theme-btn { color:#94a3b8; }
         .theme-btn.active { background:#0d9488 !important; color:#fff !important; box-shadow:0 0 0 3px rgba(13,148,136,0.5); transform:scale(1.12); border:2px solid #14b8a6; }
-        .study-card { background:white; border-radius:24px; border:1px solid #e2e8f0; padding:20px 16px; min-height:200px; width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+
+        /* === КАРТОЧКИ КАК В ANKI: центрирование по умолчанию === */
+        .card-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
+            padding: 0 4px;
+            text-align: center;           /* ← центрирование по умолчанию (как в Anki) */
+            width: 100%;
+            font-family: Georgia, 'Times New Roman', serif;
+        }
+        /* Если текст длинный (более 3 строк) — автоматически выравниваем по левому краю */
+        .card-text.text-long {
+            text-align: left;
+        }
+        .card-text-sm { font-size: 1.2rem; }
+        .card-text-md { font-size: 1.8rem; }
+        .card-text-lg { font-size: 2.2rem; }
+        @media (max-width: 480px) {
+            .card-text-lg { font-size: 1.8rem; }
+            .card-text-md { font-size: 1.5rem; }
+            .card-text-sm { font-size: 1rem; }
+        }
+
+        .study-card {
+            background: white; border-radius:24px; border:1px solid #e2e8f0;
+            padding:20px 16px; min-height:200px; width:100%;
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            max-width:100%; overflow:hidden;
+        }
         .dark .study-card { background:#1e293b; border-color:#334155; }
-        .study-card .word-english { font-size:2.5rem; }
-        .study-card .word-russian { font-size:2rem; color:#2dd4bf; }
-        .dark .study-card .word-english { color:#f1f5f9; }
+
         .rating-buttons { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding-top:12px; }
         .rating-btn { padding:12px 0; border-radius:16px; font-weight:500; font-size:1rem; text-align:center; border:none; cursor:pointer; }
         .progress-area { font-size:0.875rem; color:#64748b; }
@@ -56,11 +90,30 @@
         .image-area { width:100%; max-width:200px; margin:0 auto 12px; position:relative; }
         .image-placeholder { width:100%; max-width:200px; height:70px; border:2px dashed #cbd5e1; border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:14px; color:#94a3b8; gap:8px; cursor:pointer; margin:0 auto 12px; }
         .dark .image-placeholder { border-color:#475569; }
-        .speak-btn { color:#0d9488; font-size:1.5rem; background:none; border:none; cursor:pointer; }
+        .speak-btn { color:#0d9488; font-size:1.5rem; background:none; border:none; cursor:pointer; padding:8px; }
         .study-container { display:flex; flex-direction:column; height:100%; padding-top:4px; }
         .study-card-wrapper { flex:1; display:flex; flex-direction:column; justify-content:center; min-height:0; }
         #mastered-suggestion { animation:fadeInUp 0.3s ease-out; }
         @keyframes fadeInUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+        textarea.card-input {
+            width:100%;
+            padding:10px 12px;
+            border-radius:12px;
+            border:1px solid #cbd5e1;
+            background:transparent;
+            font-size:1rem;
+            resize:vertical;
+            min-height:60px;
+            max-height:200px;
+            font-family:Georgia, 'Times New Roman', serif;
+            color:inherit;
+        }
+        .dark textarea.card-input {
+            border-color:#475569;
+            background:#1e293b;
+            color:#f1f5f9;
+        }
     </style>
 </head>
 <body class="text-slate-900 dark:text-slate-100">
@@ -114,8 +167,12 @@
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[440px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
             <div class="font-semibold text-xl mb-4">Редактировать карточку</div>
             <div class="space-y-3">
-                <div><label class="block text-sm mb-1">Передняя сторона</label><input type="text" id="edit-english" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target"></div>
-                <div><label class="block text-sm mb-1">Обратная сторона</label><input type="text" id="edit-russian" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target"></div>
+                <div><label class="block text-sm mb-1">Передняя сторона</label>
+                    <textarea id="edit-english" class="card-input" rows="2" placeholder="Введите текст..."></textarea>
+                </div>
+                <div><label class="block text-sm mb-1">Обратная сторона</label>
+                    <textarea id="edit-russian" class="card-input" rows="2" placeholder="Введите перевод..."></textarea>
+                </div>
             </div>
             <div id="delete-photo-container" class="mt-2 hidden">
                 <button onclick="deletePhotoFromCard()" class="w-full py-3 rounded-xl border border-red-200 text-red-600 flex items-center justify-center gap-x-2 text-sm touch-target"><i class="fa-solid fa-image"></i> <span>Удалить фото</span></button>
@@ -137,8 +194,12 @@
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6">
             <div class="font-semibold text-xl mb-4">Добавить слово</div>
             <div class="space-y-3">
-                <div><label class="block text-sm mb-1">Передняя сторона</label><input type="text" id="new-english" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target"></div>
-                <div><label class="block text-sm mb-1">Обратная сторона</label><input type="text" id="new-russian" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target"></div>
+                <div><label class="block text-sm mb-1">Передняя сторона</label>
+                    <textarea id="new-english" class="card-input" rows="2" placeholder="Введите текст..."></textarea>
+                </div>
+                <div><label class="block text-sm mb-1">Обратная сторона</label>
+                    <textarea id="new-russian" class="card-input" rows="2" placeholder="Введите перевод..."></textarea>
+                </div>
             </div>
             <div class="flex gap-3 mt-4">
                 <button onclick="hideAddCardModal()" class="flex-1 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-base touch-target">Отмена</button>
@@ -147,12 +208,12 @@
         </div>
     </div>
 
-    <!-- Модалка импорта -->
+    <!-- Остальные модалки -->
     <div id="importModal" onclick="hideImportModal()" class="hidden fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]">
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
             <div class="font-semibold text-xl mb-4">Импорт слов</div>
             <div class="mb-3"><label class="block text-sm mb-1">Колода</label><select id="import-folder-select" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 touch-target"></select></div>
-            <textarea id="import-text" placeholder="beautiful - красивый&#10;hello - привет" class="w-full h-32 p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 font-mono text-sm"></textarea>
+            <textarea id="import-text" placeholder="beautiful - красивый&#10;hello - привет" class="w-full h-32 p-3 rounded-xl border dark:bg-slate-800 font-mono text-sm"></textarea>
             <div class="flex gap-3 mt-3">
                 <button onclick="hideImportModal()" class="flex-1 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-base touch-target">Отмена</button>
                 <button onclick="importWords()" class="flex-1 py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target">Импорт</button>
@@ -164,7 +225,6 @@
         </div>
     </div>
 
-    <!-- Модалка действий -->
     <div id="managementModal" onclick="hideManagementMenu()" class="hidden fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]">
         <div onclick="event.stopImmediatePropagation()" class="relative bg-white dark:bg-slate-800 w-full sm:w-[380px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
             <button onclick="hideManagementMenu()" aria-label="Закрыть" class="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 touch-target"><i class="fa-solid fa-xmark text-lg"></i></button>
@@ -179,7 +239,6 @@
         </div>
     </div>
 
-    <!-- Модалка выбора колоды для сброса прогресса -->
     <div id="resetFolderSelectionModal" onclick="hideResetFolderSelectionModal()" class="hidden fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]">
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
             <div class="font-semibold text-xl mb-4">Выберите колоду для сброса прогресса</div>
@@ -200,7 +259,7 @@
         let editingCardId = null;
         let viewingCardId = null;
 
-        // ==================== ХРАНЕНИЕ ====================
+        // ==================== ХРАНЕНИЕ И МИГРАЦИЯ ====================
         async function loadData() {
             try {
                 const stored = await localforage.getItem('folders');
@@ -985,7 +1044,7 @@
                     : `<div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl overflow-hidden">` + 
                       results.map(card => `
                         <div onclick="editCardFromSearch('${card.folderId}', '${card.id}')" class="flex justify-between items-center px-4 py-3 border-b border-slate-100 dark:border-slate-800 last:border-b-0 cursor-pointer touch-target">
-                            <div><span class="font-medium">${card.english}</span> <span class="mx-2 text-slate-400">—</span> <span class="text-slate-600 dark:text-slate-300">${card.russian}</span></div>
+                            <div class="card-text card-text-sm">${card.english} <span class="mx-2 text-slate-400">—</span> ${card.russian}</div>
                             <div class="text-xs text-teal-600 dark:text-teal-400">${card.folderName}</div>
                         </div>
                       `).join('') + `</div>`;
@@ -1059,11 +1118,7 @@
                         ${folder.cards.length === 0 ? `<div class="p-6 text-center text-slate-500 dark:text-slate-400">В этой колоде пока нет слов</div>` : 
                         folder.cards.map(card => `
                             <div id="card-${card.id}" class="card-item flex items-center px-4 py-3 border-b border-slate-100 dark:border-slate-800 last:border-b-0 cursor-pointer touch-target" onclick="viewCard('${card.id}')">
-                                <div class="flex-1">
-                                    <span class="font-medium">${card.english}</span>
-                                    <span class="mx-2 text-slate-400">—</span>
-                                    <span class="text-slate-600 dark:text-slate-300">${card.russian}</span>
-                                </div>
+                                <div class="flex-1 card-text card-text-sm">${card.english} <span class="mx-2 text-slate-400">—</span> ${card.russian}</div>
                                 <button onclick="event.stopImmediatePropagation(); uploadImageForCard('${card.id}')" class="ml-2 text-xl text-slate-400 hover:text-teal-600 touch-target"><i class="fa-solid fa-camera"></i></button>
                             </div>
                         `).join('')}
@@ -1116,6 +1171,15 @@
             }
         }
 
+        // Функция для определения, является ли текст длинным (более 3 строк)
+        function isTextLong(text) {
+            if (!text) return false;
+            // Считаем количество переносов строк
+            const lines = text.split('\n').length;
+            // Если больше 3 строк или текст содержит более 50 символов с пробелами
+            return lines > 3 || text.length > 50;
+        }
+
         function showCurrentCard() {
             if (currentCardIndex >= dueCards.length) {
                 const container = document.getElementById('main-content');
@@ -1148,6 +1212,12 @@
                 ? `<div class="image-area"><img src="${card.image}" onclick="uploadImageForCurrentCard(event)" class="w-full max-h-36 object-contain rounded-2xl cursor-pointer"><button onclick="event.stopImmediatePropagation(); removeImageFromCurrentCard()" class="absolute top-1 right-1 w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg text-sm">✕</button></div>`
                 : `<div onclick="uploadImageForCurrentCard(event)" class="image-placeholder"><i class="fa-solid fa-camera text-lg"></i> <span>Добавить фото</span></div>`;
 
+            // Определяем, длинный ли текст
+            const isEnglishLong = isTextLong(card.english);
+            const isRussianLong = isTextLong(card.russian);
+            const englishAlignClass = isEnglishLong ? 'text-long' : '';
+            const russianAlignClass = isRussianLong ? 'text-long' : '';
+
             const container = document.getElementById('main-content');
             container.innerHTML = `
                 <div class="study-container">
@@ -1155,12 +1225,10 @@
                     <div class="study-card-wrapper">
                         <div class="study-card" onclick="flipStudyCard()">
                             ${imageHtml}
-                            <div id="card-front">
-                                <div class="word-english">${card.english}</div>
+                            <div id="card-front" class="card-text card-text-lg ${englishAlignClass}" style="white-space:pre-wrap;word-break:break-word;width:100%;">${card.english}</div>
+                            <div id="card-back" class="card-text card-text-lg ${russianAlignClass}" style="white-space:pre-wrap;word-break:break-word;width:100%;display:none;">${card.russian}</div>
+                            <div class="flex gap-4 mt-4">
                                 <button onclick="event.stopImmediatePropagation(); speakWord('${card.english}')" class="speak-btn"><i class="fa-solid fa-volume-up"></i></button>
-                            </div>
-                            <div id="card-back" class="hidden">
-                                <div class="word-russian">${card.russian}</div>
                                 <button onclick="event.stopImmediatePropagation(); speakWord('${card.russian}')" class="speak-btn"><i class="fa-solid fa-volume-up"></i></button>
                             </div>
                         </div>
@@ -1188,8 +1256,8 @@
             const front = document.getElementById('card-front');
             const back = document.getElementById('card-back');
             if (!front || !back) return;
-            front.classList.toggle('hidden');
-            back.classList.toggle('hidden');
+            front.style.display = (front.style.display === 'none' ? 'block' : 'none');
+            back.style.display = (back.style.display === 'none' ? 'block' : 'none');
         }
 
         async function rateCard(grade) {
@@ -1227,11 +1295,17 @@
             if (!card) return;
             viewingCardId = cardId;
             const content = document.getElementById('card-view-content');
+
+            const isEnglishLong = isTextLong(card.english);
+            const isRussianLong = isTextLong(card.russian);
+            const englishAlignClass = isEnglishLong ? 'text-long' : '';
+            const russianAlignClass = isRussianLong ? 'text-long' : '';
+
             content.innerHTML = `
                 <div class="study-card" style="cursor:default; min-height:200px;">
-                    <div class="word-english">${card.english}</div>
+                    <div class="card-text card-text-lg ${englishAlignClass}" style="white-space:pre-wrap;word-break:break-word;width:100%;">${card.english}</div>
                     <button onclick="event.stopImmediatePropagation(); speakWord('${card.english}')" class="speak-btn"><i class="fa-solid fa-volume-up"></i></button>
-                    <div class="word-russian mt-2">${card.russian}</div>
+                    <div class="card-text card-text-lg ${russianAlignClass} mt-4" style="white-space:pre-wrap;word-break:break-word;width:100%;">${card.russian}</div>
                     <button onclick="event.stopImmediatePropagation(); speakWord('${card.russian}')" class="speak-btn"><i class="fa-solid fa-volume-up"></i></button>
                     ${card.image ? `<img src="${card.image}" class="max-h-48 mx-auto rounded-2xl mt-4">` : ''}
                 </div>
