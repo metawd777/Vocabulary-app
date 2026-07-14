@@ -754,6 +754,7 @@
             }
         }
 
+        // ========== ИСПРАВЛЕННАЯ showCurrentCard (одна кнопка озвучки) ==========
         function showCurrentCard() {
             if (currentCardIndex >= dueCards.length) {
                 const container = document.getElementById('main-content');
@@ -804,12 +805,14 @@
                             ${imageHtml}
                             <div id="card-front">
                                 <div class="word-english">${card.english}</div>
-                                <button onclick="event.stopImmediatePropagation(); speakWord('${card.english}')" class="speak-btn"><i class="fa-solid fa-volume-up"></i></button>
                             </div>
                             <div id="card-back" class="hidden">
                                 <div class="word-russian">${card.russian}</div>
-                                <button onclick="event.stopImmediatePropagation(); speakWord('${card.russian}')" class="speak-btn"><i class="fa-solid fa-volume-up"></i></button>
                             </div>
+                            <!-- ЕДИНАЯ КНОПКА ОЗВУЧКИ -->
+                            <button onclick="event.stopImmediatePropagation(); speakCurrentWord()" class="speak-btn">
+                                <i class="fa-solid fa-volume-up"></i>
+                            </button>
                         </div>
                     </div>
                     <div class="rating-buttons">
@@ -825,6 +828,43 @@
                     </div>
                 </div>
             `;
+        }
+
+        // ========== НОВАЯ ФУНКЦИЯ speakCurrentWord ==========
+        function speakCurrentWord() {
+            const front = document.getElementById('card-front');
+            const back = document.getElementById('card-back');
+            if (!front || !back) return;
+            if (!back.classList.contains('hidden')) {
+                const russian = back.querySelector('.word-russian')?.textContent;
+                if (russian) speakWord(russian);
+            } else {
+                const english = front.querySelector('.word-english')?.textContent;
+                if (english) speakWord(english);
+            }
+        }
+
+        // ========== ИСПРАВЛЕННАЯ viewCard (одна кнопка для обоих слов) ==========
+        function viewCard(cardId) {
+            const folder = getCurrentFolder();
+            const card = folder.cards.find(c => c.id === cardId);
+            if (!card) return;
+            viewingCardId = cardId;
+
+            const content = document.getElementById('card-view-content');
+            content.innerHTML = `
+                <div class="study-card" style="cursor:default; min-height:200px;">
+                    <div class="word-english">${card.english}</div>
+                    <div class="word-russian mt-2">${card.russian}</div>
+                    <button onclick="event.stopImmediatePropagation(); speakWord('${card.english}'); speakWord('${card.russian}')" class="speak-btn">
+                        <i class="fa-solid fa-volume-up"></i>
+                    </button>
+                    ${card.image ? `<img src="${card.image}" class="max-h-48 mx-auto rounded-2xl mt-4">` : ''}
+                </div>
+            `;
+
+            document.getElementById('cardViewModal').classList.remove('hidden');
+            document.getElementById('cardViewModal').classList.add('flex');
         }
 
         function flipStudyCard() {
@@ -855,28 +895,7 @@
             showCurrentCard();
         }
 
-        // ==================== ПРОСМОТР КАРТОЧКИ ====================
-        function viewCard(cardId) {
-            const folder = getCurrentFolder();
-            const card = folder.cards.find(c => c.id === cardId);
-            if (!card) return;
-            viewingCardId = cardId;
-
-            const content = document.getElementById('card-view-content');
-            content.innerHTML = `
-                <div class="study-card" style="cursor:default; min-height:200px;">
-                    <div class="word-english">${card.english}</div>
-                    <button onclick="event.stopImmediatePropagation(); speakWord('${card.english}')" class="speak-btn"><i class="fa-solid fa-volume-up"></i></button>
-                    <div class="word-russian mt-2">${card.russian}</div>
-                    <button onclick="event.stopImmediatePropagation(); speakWord('${card.russian}')" class="speak-btn"><i class="fa-solid fa-volume-up"></i></button>
-                    ${card.image ? `<img src="${card.image}" class="max-h-48 mx-auto rounded-2xl mt-4">` : ''}
-                </div>
-            `;
-
-            document.getElementById('cardViewModal').classList.remove('hidden');
-            document.getElementById('cardViewModal').classList.add('flex');
-        }
-
+        // ==================== ПРОСМОТР КАРТОЧКИ (дополнительные функции) ====================
         function hideCardViewModal() {
             document.getElementById('cardViewModal').classList.add('hidden');
             document.getElementById('cardViewModal').classList.remove('flex');
@@ -1210,27 +1229,21 @@
 
         // ==================== УЛУЧШЕННАЯ ОЗВУЧКА (Google TTS + SpeechSynthesis) ====================
 
-        // Определение языка (оставляем как есть)
         function detectLanguage(text) {
             if (/[а-яё]/i.test(text)) return 'ru';
             return 'en';
         }
 
-        // Кеш для аудио (опционально, закомментирован)
-        // const audioCache = new Map();
-
         async function speakWord(text) {
             if (!text) return;
 
             const lang = detectLanguage(text);
-            // Явно указываем американский английский и русский
             const langCode = lang === 'en' ? 'en-US' : 'ru-RU';
 
-            // 1. Пытаемся Google TTS (если есть интернет)
             try {
                 const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${langCode}&client=tw-ob&q=${encodeURIComponent(text)}`;
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 секунд таймаут
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
 
                 const response = await fetch(url, {
                     headers: {
@@ -1244,52 +1257,42 @@
                 if (response.ok) {
                     const blob = await response.blob();
                     const audioUrl = URL.createObjectURL(blob);
-                    // audioCache.set(text, audioUrl); // раскомментировать для кеширования
                     const audio = new Audio(audioUrl);
                     audio.play();
                     audio.onended = () => URL.revokeObjectURL(audioUrl);
-                    return; // успешно
+                    return;
                 } else {
                     throw new Error(`Google TTS ответил с ошибкой ${response.status}`);
                 }
             } catch (error) {
                 console.warn('Google TTS не сработал, переключаемся на speechSynthesis:', error.message);
-                // 2. Fallback на встроенный синтезатор
                 await fallbackSpeak(text, lang);
             }
         }
 
-        // ========== FALLBACK С ПРАВИЛЬНЫМ ВЫБОРОМ ГОЛОСА ==========
-
         async function fallbackSpeak(text, lang) {
             if (!window.speechSynthesis) return;
-            window.speechSynthesis.cancel(); // отменяем предыдущую речь
+            window.speechSynthesis.cancel();
 
-            const voices = await loadVoices(); // загружаем голоса
+            const voices = await loadVoices();
             const langCode = lang === 'en' ? 'en-US' : 'ru-RU';
 
             let voice = null;
             if (voices.length > 0) {
-                // 1. Точное совпадение (en-US, ru-RU)
                 voice = voices.find(v => v.lang === langCode);
-                // 2. По началу кода (en, ru)
                 if (!voice) voice = voices.find(v => v.lang.startsWith(lang));
-                // 3. По наличию языка в названии (запасной вариант)
                 if (!voice) voice = voices.find(v => v.lang.includes(lang));
-                // 4. Крайний случай – берём первый голос
                 if (!voice) voice = voices[0];
             }
 
             const utterance = new SpeechSynthesisUtterance(text);
             if (voice) utterance.voice = voice;
             utterance.lang = langCode;
-            utterance.rate = 0.9;   // комфортная скорость
+            utterance.rate = 0.9;
             utterance.pitch = 1;
             utterance.volume = 1;
             window.speechSynthesis.speak(utterance);
         }
-
-        // ========== ЗАГРУЗКА ГОЛОСОВ С ТАЙМАУТОМ ==========
 
         let voicesLoaded = false;
         let voicesList = [];
@@ -1304,7 +1307,6 @@
                     resolve([]);
                     return;
                 }
-                // Сначала пробуем получить сразу (если уже загружены)
                 let voices = window.speechSynthesis.getVoices();
                 if (voices && voices.length > 0) {
                     voicesList = voices;
@@ -1312,7 +1314,6 @@
                     resolve(voicesList);
                     return;
                 }
-                // Иначе ждём событие onvoiceschanged
                 const onVoicesChanged = () => {
                     voicesList = window.speechSynthesis.getVoices();
                     voicesLoaded = true;
@@ -1321,7 +1322,6 @@
                 };
                 window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged);
 
-                // Таймаут на случай, если событие не сработает (Safari, старые браузеры)
                 setTimeout(() => {
                     if (!voicesLoaded) {
                         const v = window.speechSynthesis.getVoices();
