@@ -13,7 +13,15 @@
     <script>
         tailwind.config = { darkMode: 'class' };
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+    <script>
+/*!
+    localForage -- Offline Storage, Improved
+    Version 1.10.0
+    https://localforage.github.io/localForage
+    (c) 2013-2017 Mozilla, Apache License 2.0
+*/
+!function(a){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=a();else if("function"==typeof define&&define.amd)define([],a);else{var b;b="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof self?self:this,b.localforage=a()}}(function(){return function a(b,c,d){function e(g,h){if(!c[g]){if(!b[g]){var i="function"==typeof require&&require;if(!h&&i)return i(g,!0);if(f)return f(g,!0);var j=new Error("Cannot find module '"+g+"'");throw j.code="MODULE_NOT_FOUND",j}var k=c[g]={exports:{}};b[g][0].call(k.exports,function(a){var c=b[g][1][a];return e(c||a)},k,k.exports,a,b,c,d)}return c[g].exports}for(var f="function"==typeof require&&require,g=0;g<d.length;g++)e(d[g]);return e}({1:[function(a,b,c){(function(a){"use strict";function c(){k=!0;for(var a,b,c=l.length;c;){for(b=l,l=[],a=-1;++a<c;)b[a]();c=l.length}k=!1}function d(a){1!==l.push(a)||k||e()}var e,f=a.MutationObserver||a.WebKitMutationObserver;if(f){var g=0,h=new f(c),i=a.document.createTextNode("");h.observe(i,{characterData:!0}),e=function(){i.data=g=++g%2}}else if(a.setImmediate||void 0===a.MessageChannel)e="document"in a&&"onreadystatechange"in a.document.createElement("script")?function(){var b=a.document.createElement("script");b.onreadystatechange=function(){c(),b.onreadystatechange=null,b.parentNode.removeChild(b),b=null},a.document.documentElement.appendChild(b)}:function(){setTimeout(c,0)};else{var j=new a.MessageChannel;j.port1.onmessage=c,e=function(){j.port2.postMessage(0)}}var k,l=[];b.exports=d}).call(this,"undefined"!=typeof global?global:"undefined"!=typeof self?self:"undefined"!=typeof window?window:{})},{}],2:[function(a,b,c){"use strict";function d(){}function e(a){if("function"!=typeof a)throw new TypeError("resolver must be a function");this.state=s,this.queue=[],this.outcome=void 0,a!==d&&i(this,a)}function f(a,b,c){this.promise=a,"function"==typeof b&&(this.onFulfilled=b,this.callFulfilled=this.otherCallFulfilled),"function"==typeof c&&(this.onRejected=c,this.callRejected=this.otherCallRejected)}function g(a,b,c){o(function(){var d;try{d=b(c)}catch(b){return p.reject(a,b)}d===a?p.reject(a,new TypeError("Cannot resolve promise with itself")):p.resolve(a,d)})}function h(a){var b=a&&a.then;if(a&&("object"==typeof a||"function"==typeof a)&&"function"==typeof b)return function(){b.apply(a,arguments)}}function i(a,b){function c(b){f||(f=!0,p.reject(a,b))}function d(b){f||(f=!0,p.resolve(a,b))}function e(){b(d,c)}var f=!1,g=j(e);"error"===g.status&&c(g.value)}function j(a,b){var c={};try{c.value=a(b),c.status="success"}catch(a){c.status="error",c.value=a}return c}function k(a){return a instanceof this?a:p.resolve(new this(d),a)}function l(a){var b=new this(d);return p.reject(b,a)}function m(a){function b(a,b){function d(a){g[b]=a,++h!==e||f||(f=!0,p.resolve(j,g))}c.resolve(a).then(d,function(a){f||(f=!0,p.reject(j,a))})}var c=this;if("[object Array]"!==Object.prototype.toString.call(a))return this.reject(new TypeError("must be an array"));var e=a.length,f=!1;if(!e)return this.resolve([]);for(var g=new Array(e),h=0,i=-1,j=new this(d);++i<e;)b(a[i],i);return j}function n(a){function b(a){c.resolve(a).then(function(a){f||(f=!0,p.resolve(h,a))},function(a){f||(f=!0,p.reject(h,a))})}var c=this;if("[object Array]"!==Object.prototype.toString.call(a))return this.reject(new TypeError("must be an array"));var e=a.length,f=!1;if(!e)return this.resolve([]);for(var g=-1,h=new this(d);++g<e;)b(a[g]);return h}var o=a(1),p={},q=["REJECTED"],r=["FULFILLED"],s=["PENDING"];b.exports=e,e.prototype.catch=function(a){return this.then(null,a)},e.prototype.then=function(a,b){if("function"!=typeof a&&this.state===r||"function"!=typeof b&&this.state===q)return this;var c=new this.constructor(d);if(this.state!==s){g(c,this.state===r?a:b,this.outcome)}else this.queue.push(new f(c,a,b));return c},f.prototype.callFulfilled=function(a){p.resolve(this.promise,a)},f.prototype.otherCallFulfilled=function(a){g(this.promise,this.onFulfilled,a)},f.prototype.callRejected=function(a){p.reject(this.promise,a)},f.prototype.otherCallRejected=function(a){g(this.promise,this.onRejected,a)},p.resolve=function(a,b){var c=j(h,b);if("error"===c.status)return p.reject(a,c.value);var d=c.value;if(d)i(a,d);else{a.state=r,a.outcome=b;for(var e=-1,f=a.queue.length;++e<f;)a.queue[e].callFulfilled(b)}return a},p.reject=function(a,b){a.state=q,a.outcome=b;for(var c=-1,d=a.queue.length;++c<d;)a.queue[c].callRejected(b);return a},e.resolve=k,e.reject=l,e.all=m,e.race=n},{1:1}],3:[function(a,b,c){(function(b){"use strict";"function"!=typeof b.Promise&&(b.Promise=a(2))}).call(this,"undefined"!=typeof global?global:"undefined"!=typeof self?self:"undefined"!=typeof window?window:{})},{2:2}],4:[function(a,b,c){"use strict";function d(a,b){if(!(a instanceof b))throw new TypeError("Cannot call a class as a function")}function e(){try{if("undefined"!=typeof indexedDB)return indexedDB;if("undefined"!=typeof webkitIndexedDB)return webkitIndexedDB;if("undefined"!=typeof mozIndexedDB)return mozIndexedDB;if("undefined"!=typeof OIndexedDB)return OIndexedDB;if("undefined"!=typeof msIndexedDB)return msIndexedDB}catch(a){return}}function f(){try{if(!ua||!ua.open)return!1;var a="undefined"!=typeof openDatabase&&/(Safari|iPhone|iPad|iPod)/.test(navigator.userAgent)&&!/Chrome/.test(navigator.userAgent)&&!/BlackBerry/.test(navigator.platform),b="function"==typeof fetch&&-1!==fetch.toString().indexOf("[native code");return(!a||b)&&"undefined"!=typeof indexedDB&&"undefined"!=typeof IDBKeyRange}catch(a){return!1}}function g(a,b){a=a||[],b=b||{};try{return new Blob(a,b)}catch(f){if("TypeError"!==f.name)throw f;for(var c="undefined"!=typeof BlobBuilder?BlobBuilder:"undefined"!=typeof MSBlobBuilder?MSBlobBuilder:"undefined"!=typeof MozBlobBuilder?MozBlobBuilder:WebKitBlobBuilder,d=new c,e=0;e<a.length;e+=1)d.append(a[e]);return d.getBlob(b.type)}}function h(a,b){b&&a.then(function(a){b(null,a)},function(a){b(a)})}function i(a,b,c){"function"==typeof b&&a.then(b),"function"==typeof c&&a.catch(c)}function j(a){return"string"!=typeof a&&(console.warn(a+" used as a key, but it is not a string."),a=String(a)),a}function k(){if(arguments.length&&"function"==typeof arguments[arguments.length-1])return arguments[arguments.length-1]}function l(a){for(var b=a.length,c=new ArrayBuffer(b),d=new Uint8Array(c),e=0;e<b;e++)d[e]=a.charCodeAt(e);return c}function m(a){return new va(function(b){var c=a.transaction(wa,Ba),d=g([""]);c.objectStore(wa).put(d,"key"),c.onabort=function(a){a.preventDefault(),a.stopPropagation(),b(!1)},c.oncomplete=function(){var a=navigator.userAgent.match(/Chrome\/(\d+)/),c=navigator.userAgent.match(/Edge\//);b(c||!a||parseInt(a[1],10)>=43)}}).catch(function(){return!1})}function n(a){return"boolean"==typeof xa?va.resolve(xa):m(a).then(function(a){return xa=a})}function o(a){var b=ya[a.name],c={};c.promise=new va(function(a,b){c.resolve=a,c.reject=b}),b.deferredOperations.push(c),b.dbReady?b.dbReady=b.dbReady.then(function(){return c.promise}):b.dbReady=c.promise}function p(a){var b=ya[a.name],c=b.deferredOperations.pop();if(c)return c.resolve(),c.promise}function q(a,b){var c=ya[a.name],d=c.deferredOperations.pop();if(d)return d.reject(b),d.promise}function r(a,b){return new va(function(c,d){if(ya[a.name]=ya[a.name]||B(),a.db){if(!b)return c(a.db);o(a),a.db.close()}var e=[a.name];b&&e.push(a.version);var f=ua.open.apply(ua,e);b&&(f.onupgradeneeded=function(b){var c=f.result;try{c.createObjectStore(a.storeName),b.oldVersion<=1&&c.createObjectStore(wa)}catch(c){if("ConstraintError"!==c.name)throw c;console.warn('The database "'+a.name+'" has been upgraded from version '+b.oldVersion+" to version "+b.newVersion+', but the storage "'+a.storeName+'" already exists.')}}),f.onerror=function(a){a.preventDefault(),d(f.error)},f.onsuccess=function(){var b=f.result;b.onversionchange=function(a){a.target.close()},c(b),p(a)}})}function s(a){return r(a,!1)}function t(a){return r(a,!0)}function u(a,b){if(!a.db)return!0;var c=!a.db.objectStoreNames.contains(a.storeName),d=a.version<a.db.version,e=a.version>a.db.version;if(d&&(a.version!==b&&console.warn('The database "'+a.name+"\" can't be downgraded from version "+a.db.version+" to version "+a.version+"."),a.version=a.db.version),e||c){if(c){var f=a.db.version+1;f>a.version&&(a.version=f)}return!0}return!1}function v(a){return new va(function(b,c){var d=new FileReader;d.onerror=c,d.onloadend=function(c){var d=btoa(c.target.result||"");b({__local_forage_encoded_blob:!0,data:d,type:a.type})},d.readAsBinaryString(a)})}function w(a){return g([l(atob(a.data))],{type:a.type})}function x(a){return a&&a.__local_forage_encoded_blob}function y(a){var b=this,c=b._initReady().then(function(){var a=ya[b._dbInfo.name];if(a&&a.dbReady)return a.dbReady});return i(c,a,a),c}function z(a){o(a);for(var b=ya[a.name],c=b.forages,d=0;d<c.length;d++){var e=c[d];e._dbInfo.db&&(e._dbInfo.db.close(),e._dbInfo.db=null)}return a.db=null,s(a).then(function(b){return a.db=b,u(a)?t(a):b}).then(function(d){a.db=b.db=d;for(var e=0;e<c.length;e++)c[e]._dbInfo.db=d}).catch(function(b){throw q(a,b),b})}function A(a,b,c,d){void 0===d&&(d=1);try{var e=a.db.transaction(a.storeName,b);c(null,e)}catch(e){if(d>0&&(!a.db||"InvalidStateError"===e.name||"NotFoundError"===e.name))return va.resolve().then(function(){if(!a.db||"NotFoundError"===e.name&&!a.db.objectStoreNames.contains(a.storeName)&&a.version<=a.db.version)return a.db&&(a.version=a.db.version+1),t(a)}).then(function(){return z(a).then(function(){A(a,b,c,d-1)})}).catch(c);c(e)}}function B(){return{forages:[],db:null,dbReady:null,deferredOperations:[]}}function C(a){function b(){return va.resolve()}var c=this,d={db:null};if(a)for(var e in a)d[e]=a[e];var f=ya[d.name];f||(f=B(),ya[d.name]=f),f.forages.push(c),c._initReady||(c._initReady=c.ready,c.ready=y);for(var g=[],h=0;h<f.forages.length;h++){var i=f.forages[h];i!==c&&g.push(i._initReady().catch(b))}var j=f.forages.slice(0);return va.all(g).then(function(){return d.db=f.db,s(d)}).then(function(a){return d.db=a,u(d,c._defaultConfig.version)?t(d):a}).then(function(a){d.db=f.db=a,c._dbInfo=d;for(var b=0;b<j.length;b++){var e=j[b];e!==c&&(e._dbInfo.db=d.db,e._dbInfo.version=d.version)}})}function D(a,b){var c=this;a=j(a);var d=new va(function(b,d){c.ready().then(function(){A(c._dbInfo,Aa,function(e,f){if(e)return d(e);try{var g=f.objectStore(c._dbInfo.storeName),h=g.get(a);h.onsuccess=function(){var a=h.result;void 0===a&&(a=null),x(a)&&(a=w(a)),b(a)},h.onerror=function(){d(h.error)}}catch(a){d(a)}})}).catch(d)});return h(d,b),d}function E(a,b){var c=this,d=new va(function(b,d){c.ready().then(function(){A(c._dbInfo,Aa,function(e,f){if(e)return d(e);try{var g=f.objectStore(c._dbInfo.storeName),h=g.openCursor(),i=1;h.onsuccess=function(){var c=h.result;if(c){var d=c.value;x(d)&&(d=w(d));var e=a(d,c.key,i++);void 0!==e?b(e):c.continue()}else b()},h.onerror=function(){d(h.error)}}catch(a){d(a)}})}).catch(d)});return h(d,b),d}function F(a,b,c){var d=this;a=j(a);var e=new va(function(c,e){var f;d.ready().then(function(){return f=d._dbInfo,"[object Blob]"===za.call(b)?n(f.db).then(function(a){return a?b:v(b)}):b}).then(function(b){A(d._dbInfo,Ba,function(f,g){if(f)return e(f);try{var h=g.objectStore(d._dbInfo.storeName);null===b&&(b=void 0);var i=h.put(b,a);g.oncomplete=function(){void 0===b&&(b=null),c(b)},g.onabort=g.onerror=function(){var a=i.error?i.error:i.transaction.error;e(a)}}catch(a){e(a)}})}).catch(e)});return h(e,c),e}function G(a,b){var c=this;a=j(a);var d=new va(function(b,d){c.ready().then(function(){A(c._dbInfo,Ba,function(e,f){if(e)return d(e);try{var g=f.objectStore(c._dbInfo.storeName),h=g.delete(a);f.oncomplete=function(){b()},f.onerror=function(){d(h.error)},f.onabort=function(){var a=h.error?h.error:h.transaction.error;d(a)}}catch(a){d(a)}})}).catch(d)});return h(d,b),d}function H(a){var b=this,c=new va(function(a,c){b.ready().then(function(){A(b._dbInfo,Ba,function(d,e){if(d)return c(d);try{var f=e.objectStore(b._dbInfo.storeName),g=f.clear();e.oncomplete=function(){a()},e.onabort=e.onerror=function(){var a=g.error?g.error:g.transaction.error;c(a)}}catch(a){c(a)}})}).catch(c)});return h(c,a),c}function I(a){var b=this,c=new va(function(a,c){b.ready().then(function(){A(b._dbInfo,Aa,function(d,e){if(d)return c(d);try{var f=e.objectStore(b._dbInfo.storeName),g=f.count();g.onsuccess=function(){a(g.result)},g.onerror=function(){c(g.error)}}catch(a){c(a)}})}).catch(c)});return h(c,a),c}function J(a,b){var c=this,d=new va(function(b,d){if(a<0)return void b(null);c.ready().then(function(){A(c._dbInfo,Aa,function(e,f){if(e)return d(e);try{var g=f.objectStore(c._dbInfo.storeName),h=!1,i=g.openKeyCursor();i.onsuccess=function(){var c=i.result;if(!c)return void b(null);0===a?b(c.key):h?b(c.key):(h=!0,c.advance(a))},i.onerror=function(){d(i.error)}}catch(a){d(a)}})}).catch(d)});return h(d,b),d}function K(a){var b=this,c=new va(function(a,c){b.ready().then(function(){A(b._dbInfo,Aa,function(d,e){if(d)return c(d);try{var f=e.objectStore(b._dbInfo.storeName),g=f.openKeyCursor(),h=[];g.onsuccess=function(){var b=g.result;if(!b)return void a(h);h.push(b.key),b.continue()},g.onerror=function(){c(g.error)}}catch(a){c(a)}})}).catch(c)});return h(c,a),c}function L(a,b){b=k.apply(this,arguments);var c=this.config();a="function"!=typeof a&&a||{},a.name||(a.name=a.name||c.name,a.storeName=a.storeName||c.storeName);var d,e=this;if(a.name){var f=a.name===c.name&&e._dbInfo.db,g=f?va.resolve(e._dbInfo.db):s(a).then(function(b){var c=ya[a.name],d=c.forages;c.db=b;for(var e=0;e<d.length;e++)d[e]._dbInfo.db=b;return b});d=a.storeName?g.then(function(b){if(b.objectStoreNames.contains(a.storeName)){var c=b.version+1;o(a);var d=ya[a.name],e=d.forages;b.close();for(var f=0;f<e.length;f++){var g=e[f];g._dbInfo.db=null,g._dbInfo.version=c}return new va(function(b,d){var e=ua.open(a.name,c);e.onerror=function(a){e.result.close(),d(a)},e.onupgradeneeded=function(){e.result.deleteObjectStore(a.storeName)},e.onsuccess=function(){var a=e.result;a.close(),b(a)}}).then(function(a){d.db=a;for(var b=0;b<e.length;b++){var c=e[b];c._dbInfo.db=a,p(c._dbInfo)}}).catch(function(b){throw(q(a,b)||va.resolve()).catch(function(){}),b})}}):g.then(function(b){o(a);var c=ya[a.name],d=c.forages;b.close();for(var e=0;e<d.length;e++){d[e]._dbInfo.db=null}return new va(function(b,c){var d=ua.deleteDatabase(a.name);d.onerror=function(){var a=d.result;a&&a.close(),c(d.error)},d.onblocked=function(){console.warn('dropInstance blocked for database "'+a.name+'" until all open connections are closed')},d.onsuccess=function(){var a=d.result;a&&a.close(),b(a)}}).then(function(a){c.db=a;for(var b=0;b<d.length;b++)p(d[b]._dbInfo)}).catch(function(b){throw(q(a,b)||va.resolve()).catch(function(){}),b})})}else d=va.reject("Invalid arguments");return h(d,b),d}function M(){return"function"==typeof openDatabase}function N(a){var b,c,d,e,f,g=.75*a.length,h=a.length,i=0;"="===a[a.length-1]&&(g--,"="===a[a.length-2]&&g--);var j=new ArrayBuffer(g),k=new Uint8Array(j);for(b=0;b<h;b+=4)c=Da.indexOf(a[b]),d=Da.indexOf(a[b+1]),e=Da.indexOf(a[b+2]),f=Da.indexOf(a[b+3]),k[i++]=c<<2|d>>4,k[i++]=(15&d)<<4|e>>2,k[i++]=(3&e)<<6|63&f;return j}function O(a){var b,c=new Uint8Array(a),d="";for(b=0;b<c.length;b+=3)d+=Da[c[b]>>2],d+=Da[(3&c[b])<<4|c[b+1]>>4],d+=Da[(15&c[b+1])<<2|c[b+2]>>6],d+=Da[63&c[b+2]];return c.length%3==2?d=d.substring(0,d.length-1)+"=":c.length%3==1&&(d=d.substring(0,d.length-2)+"=="),d}function P(a,b){var c="";if(a&&(c=Ua.call(a)),a&&("[object ArrayBuffer]"===c||a.buffer&&"[object ArrayBuffer]"===Ua.call(a.buffer))){var d,e=Ga;a instanceof ArrayBuffer?(d=a,e+=Ia):(d=a.buffer,"[object Int8Array]"===c?e+=Ka:"[object Uint8Array]"===c?e+=La:"[object Uint8ClampedArray]"===c?e+=Ma:"[object Int16Array]"===c?e+=Na:"[object Uint16Array]"===c?e+=Pa:"[object Int32Array]"===c?e+=Oa:"[object Uint32Array]"===c?e+=Qa:"[object Float32Array]"===c?e+=Ra:"[object Float64Array]"===c?e+=Sa:b(new Error("Failed to get type for BinaryArray"))),b(e+O(d))}else if("[object Blob]"===c){var f=new FileReader;f.onload=function(){var c=Ea+a.type+"~"+O(this.result);b(Ga+Ja+c)},f.readAsArrayBuffer(a)}else try{b(JSON.stringify(a))}catch(c){console.error("Couldn't convert value into a JSON string: ",a),b(null,c)}}function Q(a){if(a.substring(0,Ha)!==Ga)return JSON.parse(a);var b,c=a.substring(Ta),d=a.substring(Ha,Ta);if(d===Ja&&Fa.test(c)){var e=c.match(Fa);b=e[1],c=c.substring(e[0].length)}var f=N(c);switch(d){case Ia:return f;case Ja:return g([f],{type:b});case Ka:return new Int8Array(f);case La:return new Uint8Array(f);case Ma:return new Uint8ClampedArray(f);case Na:return new Int16Array(f);case Pa:return new Uint16Array(f);case Oa:return new Int32Array(f);case Qa:return new Uint32Array(f);case Ra:return new Float32Array(f);case Sa:return new Float64Array(f);default:throw new Error("Unkown type: "+d)}}function R(a,b,c,d){a.executeSql("CREATE TABLE IF NOT EXISTS "+b.storeName+" (id INTEGER PRIMARY KEY, key unique, value)",[],c,d)}function S(a){var b=this,c={db:null};if(a)for(var d in a)c[d]="string"!=typeof a[d]?a[d].toString():a[d];var e=new va(function(a,d){try{c.db=openDatabase(c.name,String(c.version),c.description,c.size)}catch(a){return d(a)}c.db.transaction(function(e){R(e,c,function(){b._dbInfo=c,a()},function(a,b){d(b)})},d)});return c.serializer=Va,e}function T(a,b,c,d,e,f){a.executeSql(c,d,e,function(a,g){g.code===g.SYNTAX_ERR?a.executeSql("SELECT name FROM sqlite_master WHERE type='table' AND name = ?",[b.storeName],function(a,h){h.rows.length?f(a,g):R(a,b,function(){a.executeSql(c,d,e,f)},f)},f):f(a,g)},f)}function U(a,b){var c=this;a=j(a);var d=new va(function(b,d){c.ready().then(function(){var e=c._dbInfo;e.db.transaction(function(c){T(c,e,"SELECT * FROM "+e.storeName+" WHERE key = ? LIMIT 1",[a],function(a,c){var d=c.rows.length?c.rows.item(0).value:null;d&&(d=e.serializer.deserialize(d)),b(d)},function(a,b){d(b)})})}).catch(d)});return h(d,b),d}function V(a,b){var c=this,d=new va(function(b,d){c.ready().then(function(){var e=c._dbInfo;e.db.transaction(function(c){T(c,e,"SELECT * FROM "+e.storeName,[],function(c,d){for(var f=d.rows,g=f.length,h=0;h<g;h++){var i=f.item(h),j=i.value;if(j&&(j=e.serializer.deserialize(j)),void 0!==(j=a(j,i.key,h+1)))return void b(j)}b()},function(a,b){d(b)})})}).catch(d)});return h(d,b),d}function W(a,b,c,d){var e=this;a=j(a);var f=new va(function(f,g){e.ready().then(function(){void 0===b&&(b=null);var h=b,i=e._dbInfo;i.serializer.serialize(b,function(b,j){j?g(j):i.db.transaction(function(c){T(c,i,"INSERT OR REPLACE INTO "+i.storeName+" (key, value) VALUES (?, ?)",[a,b],function(){f(h)},function(a,b){g(b)})},function(b){if(b.code===b.QUOTA_ERR){if(d>0)return void f(W.apply(e,[a,h,c,d-1]));g(b)}})})}).catch(g)});return h(f,c),f}function X(a,b,c){return W.apply(this,[a,b,c,1])}function Y(a,b){var c=this;a=j(a);var d=new va(function(b,d){c.ready().then(function(){var e=c._dbInfo;e.db.transaction(function(c){T(c,e,"DELETE FROM "+e.storeName+" WHERE key = ?",[a],function(){b()},function(a,b){d(b)})})}).catch(d)});return h(d,b),d}function Z(a){var b=this,c=new va(function(a,c){b.ready().then(function(){var d=b._dbInfo;d.db.transaction(function(b){T(b,d,"DELETE FROM "+d.storeName,[],function(){a()},function(a,b){c(b)})})}).catch(c)});return h(c,a),c}function $(a){var b=this,c=new va(function(a,c){b.ready().then(function(){var d=b._dbInfo;d.db.transaction(function(b){T(b,d,"SELECT COUNT(key) as c FROM "+d.storeName,[],function(b,c){var d=c.rows.item(0).c;a(d)},function(a,b){c(b)})})}).catch(c)});return h(c,a),c}function _(a,b){var c=this,d=new va(function(b,d){c.ready().then(function(){var e=c._dbInfo;e.db.transaction(function(c){T(c,e,"SELECT key FROM "+e.storeName+" WHERE id = ? LIMIT 1",[a+1],function(a,c){var d=c.rows.length?c.rows.item(0).key:null;b(d)},function(a,b){d(b)})})}).catch(d)});return h(d,b),d}function aa(a){var b=this,c=new va(function(a,c){b.ready().then(function(){var d=b._dbInfo;d.db.transaction(function(b){T(b,d,"SELECT key FROM "+d.storeName,[],function(b,c){for(var d=[],e=0;e<c.rows.length;e++)d.push(c.rows.item(e).key);a(d)},function(a,b){c(b)})})}).catch(c)});return h(c,a),c}function ba(a){return new va(function(b,c){a.transaction(function(d){d.executeSql("SELECT name FROM sqlite_master WHERE type='table' AND name <> '__WebKitDatabaseInfoTable__'",[],function(c,d){for(var e=[],f=0;f<d.rows.length;f++)e.push(d.rows.item(f).name);b({db:a,storeNames:e})},function(a,b){c(b)})},function(a){c(a)})})}function ca(a,b){b=k.apply(this,arguments);var c=this.config();a="function"!=typeof a&&a||{},a.name||(a.name=a.name||c.name,a.storeName=a.storeName||c.storeName);var d,e=this;return d=a.name?new va(function(b){var d;d=a.name===c.name?e._dbInfo.db:openDatabase(a.name,"","",0),b(a.storeName?{db:d,storeNames:[a.storeName]}:ba(d))}).then(function(a){return new va(function(b,c){a.db.transaction(function(d){function e(a){return new va(function(b,c){d.executeSql("DROP TABLE IF EXISTS "+a,[],function(){b()},function(a,b){c(b)})})}for(var f=[],g=0,h=a.storeNames.length;g<h;g++)f.push(e(a.storeNames[g]));va.all(f).then(function(){b()}).catch(function(a){c(a)})},function(a){c(a)})})}):va.reject("Invalid arguments"),h(d,b),d}function da(){try{return"undefined"!=typeof localStorage&&"setItem"in localStorage&&!!localStorage.setItem}catch(a){return!1}}function ea(a,b){var c=a.name+"/";return a.storeName!==b.storeName&&(c+=a.storeName+"/"),c}function fa(){var a="_localforage_support_test";try{return localStorage.setItem(a,!0),localStorage.removeItem(a),!1}catch(a){return!0}}function ga(){return!fa()||localStorage.length>0}function ha(a){var b=this,c={};if(a)for(var d in a)c[d]=a[d];return c.keyPrefix=ea(a,b._defaultConfig),ga()?(b._dbInfo=c,c.serializer=Va,va.resolve()):va.reject()}function ia(a){var b=this,c=b.ready().then(function(){for(var a=b._dbInfo.keyPrefix,c=localStorage.length-1;c>=0;c--){var d=localStorage.key(c);0===d.indexOf(a)&&localStorage.removeItem(d)}});return h(c,a),c}function ja(a,b){var c=this;a=j(a);var d=c.ready().then(function(){var b=c._dbInfo,d=localStorage.getItem(b.keyPrefix+a);return d&&(d=b.serializer.deserialize(d)),d});return h(d,b),d}function ka(a,b){var c=this,d=c.ready().then(function(){for(var b=c._dbInfo,d=b.keyPrefix,e=d.length,f=localStorage.length,g=1,h=0;h<f;h++){var i=localStorage.key(h);if(0===i.indexOf(d)){var j=localStorage.getItem(i);if(j&&(j=b.serializer.deserialize(j)),void 0!==(j=a(j,i.substring(e),g++)))return j}}});return h(d,b),d}function la(a,b){var c=this,d=c.ready().then(function(){var b,d=c._dbInfo;try{b=localStorage.key(a)}catch(a){b=null}return b&&(b=b.substring(d.keyPrefix.length)),b});return h(d,b),d}function ma(a){var b=this,c=b.ready().then(function(){for(var a=b._dbInfo,c=localStorage.length,d=[],e=0;e<c;e++){var f=localStorage.key(e);0===f.indexOf(a.keyPrefix)&&d.push(f.substring(a.keyPrefix.length))}return d});return h(c,a),c}function na(a){var b=this,c=b.keys().then(function(a){return a.length});return h(c,a),c}function oa(a,b){var c=this;a=j(a);var d=c.ready().then(function(){var b=c._dbInfo;localStorage.removeItem(b.keyPrefix+a)});return h(d,b),d}function pa(a,b,c){var d=this;a=j(a);var e=d.ready().then(function(){void 0===b&&(b=null);var c=b;return new va(function(e,f){var g=d._dbInfo;g.serializer.serialize(b,function(b,d){if(d)f(d);else try{localStorage.setItem(g.keyPrefix+a,b),e(c)}catch(a){"QuotaExceededError"!==a.name&&"NS_ERROR_DOM_QUOTA_REACHED"!==a.name||f(a),f(a)}})})});return h(e,c),e}function qa(a,b){if(b=k.apply(this,arguments),a="function"!=typeof a&&a||{},!a.name){var c=this.config();a.name=a.name||c.name,a.storeName=a.storeName||c.storeName}var d,e=this;return d=a.name?new va(function(b){b(a.storeName?ea(a,e._defaultConfig):a.name+"/")}).then(function(a){for(var b=localStorage.length-1;b>=0;b--){var c=localStorage.key(b);0===c.indexOf(a)&&localStorage.removeItem(c)}}):va.reject("Invalid arguments"),h(d,b),d}function ra(a,b){a[b]=function(){var c=arguments;return a.ready().then(function(){return a[b].apply(a,c)})}}function sa(){for(var a=1;a<arguments.length;a++){var b=arguments[a];if(b)for(var c in b)b.hasOwnProperty(c)&&($a(b[c])?arguments[0][c]=b[c].slice():arguments[0][c]=b[c])}return arguments[0]}var ta="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(a){return typeof a}:function(a){return a&&"function"==typeof Symbol&&a.constructor===Symbol&&a!==Symbol.prototype?"symbol":typeof a},ua=e();"undefined"==typeof Promise&&a(3);var va=Promise,wa="local-forage-detect-blob-support",xa=void 0,ya={},za=Object.prototype.toString,Aa="readonly",Ba="readwrite",Ca={_driver:"asyncStorage",_initStorage:C,_support:f(),iterate:E,getItem:D,setItem:F,removeItem:G,clear:H,length:I,key:J,keys:K,dropInstance:L},Da="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",Ea="~~local_forage_type~",Fa=/^~~local_forage_type~([^~]+)~/,Ga="__lfsc__:",Ha=Ga.length,Ia="arbf",Ja="blob",Ka="si08",La="ui08",Ma="uic8",Na="si16",Oa="si32",Pa="ur16",Qa="ui32",Ra="fl32",Sa="fl64",Ta=Ha+Ia.length,Ua=Object.prototype.toString,Va={serialize:P,deserialize:Q,stringToBuffer:N,bufferToString:O},Wa={_driver:"webSQLStorage",_initStorage:S,_support:M(),iterate:V,getItem:U,setItem:X,removeItem:Y,clear:Z,length:$,key:_,keys:aa,dropInstance:ca},Xa={_driver:"localStorageWrapper",_initStorage:ha,_support:da(),iterate:ka,getItem:ja,setItem:pa,removeItem:oa,clear:ia,length:na,key:la,keys:ma,dropInstance:qa},Ya=function(a,b){return a===b||"number"==typeof a&&"number"==typeof b&&isNaN(a)&&isNaN(b)},Za=function(a,b){for(var c=a.length,d=0;d<c;){if(Ya(a[d],b))return!0;d++}return!1},$a=Array.isArray||function(a){return"[object Array]"===Object.prototype.toString.call(a)},_a={},ab={},bb={INDEXEDDB:Ca,WEBSQL:Wa,LOCALSTORAGE:Xa},cb=[bb.INDEXEDDB._driver,bb.WEBSQL._driver,bb.LOCALSTORAGE._driver],db=["dropInstance"],eb=["clear","getItem","iterate","key","keys","length","removeItem","setItem"].concat(db),fb={description:"",driver:cb.slice(),name:"localforage",size:4980736,storeName:"keyvaluepairs",version:1},gb=function(){function a(b){d(this,a);for(var c in bb)if(bb.hasOwnProperty(c)){var e=bb[c],f=e._driver;this[c]=f,_a[f]||this.defineDriver(e)}this._defaultConfig=sa({},fb),this._config=sa({},this._defaultConfig,b),this._driverSet=null,this._initDriver=null,this._ready=!1,this._dbInfo=null,this._wrapLibraryMethodsWithReady(),this.setDriver(this._config.driver).catch(function(){})}return a.prototype.config=function(a){if("object"===(void 0===a?"undefined":ta(a))){if(this._ready)return new Error("Can't call config() after localforage has been used.");for(var b in a){if("storeName"===b&&(a[b]=a[b].replace(/\W/g,"_")),"version"===b&&"number"!=typeof a[b])return new Error("Database version must be a number.");this._config[b]=a[b]}return!("driver"in a&&a.driver)||this.setDriver(this._config.driver)}return"string"==typeof a?this._config[a]:this._config},a.prototype.defineDriver=function(a,b,c){var d=new va(function(b,c){try{var d=a._driver,e=new Error("Custom driver not compliant; see https://mozilla.github.io/localForage/#definedriver");if(!a._driver)return void c(e);for(var f=eb.concat("_initStorage"),g=0,i=f.length;g<i;g++){var j=f[g];if((!Za(db,j)||a[j])&&"function"!=typeof a[j])return void c(e)}(function(){for(var b=function(a){return function(){var b=new Error("Method "+a+" is not implemented by the current driver"),c=va.reject(b);return h(c,arguments[arguments.length-1]),c}},c=0,d=db.length;c<d;c++){var e=db[c];a[e]||(a[e]=b(e))}})();var k=function(c){_a[d]&&console.info("Redefining LocalForage driver: "+d),_a[d]=a,ab[d]=c,b()};"_support"in a?a._support&&"function"==typeof a._support?a._support().then(k,c):k(!!a._support):k(!0)}catch(a){c(a)}});return i(d,b,c),d},a.prototype.driver=function(){return this._driver||null},a.prototype.getDriver=function(a,b,c){var d=_a[a]?va.resolve(_a[a]):va.reject(new Error("Driver not found."));return i(d,b,c),d},a.prototype.getSerializer=function(a){var b=va.resolve(Va);return i(b,a),b},a.prototype.ready=function(a){var b=this,c=b._driverSet.then(function(){return null===b._ready&&(b._ready=b._initDriver()),b._ready});return i(c,a,a),c},a.prototype.setDriver=function(a,b,c){function d(){g._config.driver=g.driver()}function e(a){return g._extend(a),d(),g._ready=g._initStorage(g._config),g._ready}function f(a){return function(){function b(){for(;c<a.length;){var f=a[c];return c++,g._dbInfo=null,g._ready=null,g.getDriver(f).then(e).catch(b)}d();var h=new Error("No available storage method found.");return g._driverSet=va.reject(h),g._driverSet}var c=0;return b()}}var g=this;$a(a)||(a=[a]);var h=this._getSupportedDrivers(a),j=null!==this._driverSet?this._driverSet.catch(function(){return va.resolve()}):va.resolve();return this._driverSet=j.then(function(){var a=h[0];return g._dbInfo=null,g._ready=null,g.getDriver(a).then(function(a){g._driver=a._driver,d(),g._wrapLibraryMethodsWithReady(),g._initDriver=f(h)})}).catch(function(){d();var a=new Error("No available storage method found.");return g._driverSet=va.reject(a),g._driverSet}),i(this._driverSet,b,c),this._driverSet},a.prototype.supports=function(a){return!!ab[a]},a.prototype._extend=function(a){sa(this,a)},a.prototype._getSupportedDrivers=function(a){for(var b=[],c=0,d=a.length;c<d;c++){var e=a[c];this.supports(e)&&b.push(e)}return b},a.prototype._wrapLibraryMethodsWithReady=function(){for(var a=0,b=eb.length;a<b;a++)ra(this,eb[a])},a.prototype.createInstance=function(b){return new a(b)},a}(),hb=new gb;b.exports=hb},{3:3}]},{},[4])(4)});
+    </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -72,6 +80,7 @@
             padding: 0 4px;
             line-height: 1.3;
             width: 100%;
+            white-space: pre-line;
         }
         .study-card .word-english { font-size: 2.5rem; }
         .study-card .word-russian { font-size: 2rem; }
@@ -188,19 +197,6 @@
             word-break: break-word;
         }
 
-        /* Utility-классы для сокращения повторяющихся Tailwind-комбинаций */
-        .btn {
-            padding: 12px 0;
-            border-radius: 16px;
-            font-weight: 500;
-            font-size: 1rem;
-            text-align: center;
-            transition: transform 0.1s;
-            border: none;
-            cursor: pointer;
-        }
-        .btn:active { transform: scale(0.95); }
-
         .list-item {
             display: flex;
             align-items: center;
@@ -210,21 +206,46 @@
         }
         .dark .list-item { border-color: #334155; }
 
-        .modal-btn {
-            flex: 1;
-            padding: 12px 0;
-            border-radius: 16px;
-            font-size: 1rem;
-            text-align: center;
-            border: 1px solid #cbd5e1;
-        }
-        .dark .modal-btn { border-color: #475569; }
+        /* Utility-классы для сокращения повторяющихся Tailwind-комбинаций.
+           Каждый класс ниже — это ровно та же комбинация, что раньше писалась
+           длинной строкой прямо в HTML/шаблонах. Поведение не меняется. */
+        .stat-card { background:white; border:1px solid #e2e8f0; border-radius:24px; padding:16px; text-align:center; }
+        .dark .stat-card { background:#1e293b; border-color:#334155; }
 
-        .section-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 12px;
+        .stat-label { font-size:0.75rem; color:#64748b; margin-top:4px; }
+        .dark .stat-label { color:#94a3b8; }
+
+        .panel { background:white; border:1px solid #e2e8f0; border-radius:24px; padding:16px; margin-bottom:12px; }
+        .dark .panel { background:#1e293b; border-color:#334155; }
+
+        .menu-item { width:100%; text-align:left; padding:12px 16px; border-radius:16px; display:flex; align-items:center; gap:12px; font-size:1rem; min-height:48px; min-width:48px; background:transparent; border:none; cursor:pointer; }
+        .menu-item:hover { background:#f1f5f9; }
+        .dark .menu-item:hover { background:#334155; }
+
+        .field-input { width:100%; padding:8px 12px; border-radius:12px; border:1px solid #cbd5e1; }
+        .dark .field-input { border-color:#475569; background:#1e293b; }
+
+        .nav-btn { display:flex; flex-direction:column; align-items:center; padding:4px 0; color:#475569; min-height:48px; min-width:48px; background:none; border:none; cursor:pointer; }
+        .dark .nav-btn { color:#cbd5e1; }
+
+        .modal-panel-sm { background:white; width:100%; border-radius:24px 24px 0 0; padding:24px; }
+        .dark .modal-panel-sm { background:#1e293b; }
+        @media (min-width:640px) { .modal-panel-sm { width:420px; border-radius:24px; } }
+
+        .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.6); align-items:flex-end; justify-content:center; z-index:100; }
+        @media (min-width:640px) { .modal-overlay { align-items:center; } }
+
+        .btn-cancel-block, .btn-secondary-half, .btn-primary-half {
+            padding:12px 0; border-radius:16px; font-size:1rem; font-weight:500; text-align:center;
+            min-height:48px; min-width:48px; cursor:pointer;
         }
+        .btn-cancel-block { width:100%; margin-top:16px; border:1px solid #cbd5e1; background:transparent; color:inherit; }
+        .dark .btn-cancel-block { border-color:#475569; }
+        .btn-secondary-half { flex:1; border:1px solid #cbd5e1; background:transparent; color:inherit; }
+        .dark .btn-secondary-half { border-color:#475569; }
+        .btn-primary-half { flex:1; background:#0d9488; color:white; border:none; }
+
+        .empty-state { display:flex; align-items:center; justify-content:center; padding:0 16px; overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch; }
     </style>
 </head>
 <body class="text-slate-900 dark:text-slate-100">
@@ -254,23 +275,23 @@
     <!-- Нижняя навигация -->
     <div class="bottom-nav max-w-3xl mx-auto w-full">
         <div class="grid grid-cols-4 text-center py-1 text-xs">
-            <button onclick="showFoldersView()" id="nav-folders" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target">
+            <button onclick="showFoldersView()" id="nav-folders" class="nav-btn">
                 <i class="fa-solid fa-folder text-xl mb-0.5"></i><span>Колоды</span>
             </button>
-            <button onclick="startStudy()" id="nav-study" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target">
+            <button onclick="startStudy()" id="nav-study" class="nav-btn">
                 <i class="fa-solid fa-graduation-cap text-xl mb-0.5"></i><span>Учить</span>
             </button>
-            <button onclick="showStatsView()" id="nav-stats" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target">
+            <button onclick="showStatsView()" id="nav-stats" class="nav-btn">
                 <i class="fa-solid fa-chart-simple text-xl mb-0.5"></i><span>Статистика</span>
             </button>
-            <button onclick="showSettingsView()" id="nav-settings" class="flex flex-col items-center py-1 text-slate-600 dark:text-slate-300 touch-target">
+            <button onclick="showSettingsView()" id="nav-settings" class="nav-btn">
                 <i class="fa-solid fa-gear text-xl mb-0.5"></i><span>Настройки</span>
             </button>
         </div>
     </div>
 
     <!-- Модалка просмотра карточки -->
-    <div id="cardViewModal" onclick="hideCardViewModal()" class="hidden fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]">
+    <div id="cardViewModal" onclick="hideCardViewModal()" class="modal-overlay hidden flex">
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
             <div id="card-view-content" class="text-center"></div>
             <div class="flex gap-3 mt-6">
@@ -286,15 +307,15 @@
     </div>
 
     <!-- Модалка редактирования -->
-    <div id="editModal" onclick="hideEditModal()" class="hidden fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]">
+    <div id="editModal" onclick="hideEditModal()" class="modal-overlay hidden flex">
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[440px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
             <div class="font-semibold text-xl mb-4">Редактировать карточку</div>
             <div class="space-y-3">
                 <div><label class="block text-sm mb-1">Передняя сторона</label>
-                    <textarea id="edit-english" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" rows="2"></textarea>
+                    <textarea id="edit-english" class="field-input touch-target text-base" rows="2"></textarea>
                 </div>
                 <div><label class="block text-sm mb-1">Обратная сторона</label>
-                    <textarea id="edit-russian" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" rows="2"></textarea>
+                    <textarea id="edit-russian" class="field-input touch-target text-base" rows="2"></textarea>
                 </div>
             </div>
             <div class="mt-4">
@@ -305,49 +326,55 @@
             <details class="mt-3">
                 <summary class="cursor-pointer text-sm text-slate-500 dark:text-slate-400">Дополнительные параметры (FSRS)</summary>
                 <div class="pt-3 grid grid-cols-2 gap-3">
-                    <div><label class="block text-xs mb-1">Стабильность</label><input type="number" step="0.01" id="edit-stability" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800"></div>
-                    <div><label class="block text-xs mb-1">Сложность</label><input type="number" step="0.01" id="edit-difficulty" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800"></div>
+                    <div><label class="block text-xs mb-1">Стабильность</label><input type="number" step="0.01" id="edit-stability" class="field-input"></div>
+                    <div><label class="block text-xs mb-1">Сложность</label><input type="number" step="0.01" id="edit-difficulty" class="field-input"></div>
                     <div><label class="block text-xs mb-1">Статус</label>
-                        <select id="edit-state" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800">
+                        <select id="edit-state" class="field-input">
                             <option value="new">Новая</option>
                             <option value="learning">Изучается</option>
                             <option value="review">На повторении</option>
                             <option value="relearning">Переучивается</option>
                         </select>
                     </div>
-                    <div><label class="block text-xs mb-1">След. повторение</label><input type="date" id="edit-next-date" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800"></div>
+                    <div><label class="block text-xs mb-1">След. повторение</label><input type="date" id="edit-next-date" class="field-input"></div>
                 </div>
             </details>
             <button id="mastered-action-btn" class="mt-3 w-full py-3 rounded-xl border flex items-center justify-center gap-x-2 text-sm touch-target" style="display:none;"></button>
             <div class="flex gap-3 mt-4">
-                <button onclick="hideEditModal()" class="flex-1 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-base touch-target">Отмена</button>
-                <button onclick="saveEditedCard()" class="flex-1 py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target">Сохранить</button>
+                <button onclick="hideEditModal()" class="btn-secondary-half">Отмена</button>
+                <button onclick="saveEditedCard()" class="btn-primary-half">Сохранить</button>
             </div>
             <button onclick="deleteCurrentCard()" class="mt-2 w-full py-2 text-red-600 text-sm touch-target">Удалить карточку</button>
         </div>
     </div>
 
-    <!-- Модалка добавления -->
-    <div id="addCardModal" onclick="hideAddCardModal()" class="hidden fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]">
-        <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6">
+    <!-- Модалка добавления (с чекбоксом реверсивной карточки) -->
+    <div id="addCardModal" onclick="hideAddCardModal()" class="modal-overlay hidden flex">
+        <div onclick="event.stopImmediatePropagation()" class="modal-panel-sm">
             <div class="font-semibold text-xl mb-4">Добавить слово</div>
             <div class="space-y-3">
                 <div><label class="block text-sm mb-1">Передняя сторона</label>
-                    <textarea id="new-english" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" rows="2"></textarea>
+                    <textarea id="new-english" class="field-input touch-target text-base" rows="2"></textarea>
                 </div>
                 <div><label class="block text-sm mb-1">Обратная сторона</label>
-                    <textarea id="new-russian" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" rows="2"></textarea>
+                    <textarea id="new-russian" class="field-input touch-target text-base" rows="2"></textarea>
                 </div>
             </div>
+            <div class="flex items-center gap-x-2 mt-3">
+                <input type="checkbox" id="is-reversible" class="w-4 h-4 accent-teal-600">
+                <label for="is-reversible" class="text-sm cursor-pointer">
+                    Создать реверсивную карточку (учить в обе стороны)
+                </label>
+            </div>
             <div class="flex gap-3 mt-4">
-                <button onclick="hideAddCardModal()" class="flex-1 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-base touch-target">Отмена</button>
-                <button onclick="addNewCard()" class="flex-1 py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target">Добавить</button>
+                <button onclick="hideAddCardModal()" class="btn-secondary-half">Отмена</button>
+                <button onclick="addNewCard()" class="btn-primary-half">Добавить</button>
             </div>
         </div>
     </div>
 
     <!-- Модалка достижения -->
-    <div id="achievementModal" class="hidden fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]">
+    <div id="achievementModal" class="modal-overlay hidden flex">
         <div class="bg-white dark:bg-slate-800 w-full sm:w-[380px] rounded-t-3xl sm:rounded-3xl p-6 text-center">
             <div id="achievement-icon" class="w-20 h-20 mx-auto rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-4xl mb-3">🏆</div>
             <div class="text-sm text-amber-600 dark:text-amber-400 font-medium mb-1">Новое достижение!</div>
@@ -358,11 +385,11 @@
     </div>
 
     <!-- Модалка выбора колоды для сброса прогресса -->
-    <div id="resetFolderSelectionModal" onclick="hideResetFolderSelectionModal()" class="hidden fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]">
+    <div id="resetFolderSelectionModal" onclick="hideResetFolderSelectionModal()" class="modal-overlay hidden flex">
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
             <div class="font-semibold text-xl mb-4">Выберите колоду для сброса прогресса</div>
             <div class="space-y-2" id="reset-folder-list"></div>
-            <button onclick="hideResetFolderSelectionModal()" class="mt-4 w-full py-3 rounded-2xl border border-slate-300 dark:border-slate-600 text-base touch-target">Отмена</button>
+            <button onclick="hideResetFolderSelectionModal()" class="btn-cancel-block">Отмена</button>
         </div>
     </div>
 
@@ -377,11 +404,12 @@
         let initialDueCount = 0;
         let editingCardId = null;
         let viewingCardId = null;
+        let editContext = 'folder'; // 'folder' | 'study' — куда возвращаться после закрытия модалки редактирования
         let stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0 };
         let lastReviewedCard = null;
         let dailyLimitEnabled = false;
         let dailyLimitCount = 20;
-        let sessionStableCandidates = []; // для показа стабильных слов в конце сессии
+        let sessionStableCandidates = [];
 
         // ==================== MEDIA STORE (Cache API для изображений) ====================
         const MediaStore = {
@@ -477,7 +505,6 @@
                 const url = await MediaStore.getImage(card.imageId);
                 if (url) return url;
 
-                // Изображение не найдено в кэше (очистка кэша браузером / eviction)
                 console.warn('Изображение не найдено в кэше, imageId:', card.imageId);
                 return null;
             }
@@ -532,8 +559,15 @@
                         changed = true;
                     }
 
-                    card.stability = safeStability(card.stability);
-                    card.difficulty = safeDifficulty(card.difficulty);
+                    // Исправление: не применять safeStability/safeDifficulty к новым карточкам
+                    if (card.state !== 'new') {
+                        card.stability = safeStability(card.stability);
+                        card.difficulty = safeDifficulty(card.difficulty);
+                    } else {
+                        // Удаляем поля, чтобы они не мешали
+                        delete card.stability;
+                        delete card.difficulty;
+                    }
 
                     if (!card.state) {
                         card.state = 'new';
@@ -552,12 +586,14 @@
         function debounce(func, wait) {
             let timeout;
             return function executedFunction(...args) {
-                const later = () => {
+                return new Promise((resolve) => {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        Promise.resolve(func(...args)).then(resolve);
+                    };
                     clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
+                    timeout = setTimeout(later, wait);
+                });
             };
         }
 
@@ -1008,6 +1044,7 @@
             return { total, statNew, statLearning, statReview, statRelearning, totalReps, totalLapses, percentCorrect, avgStability, learnedCount, totalImages, totalFlips, maxConsecutiveCorrect, todayStats };
         }
 
+        // Достижения объявлены здесь, но код продолжается
         const ACHIEVEMENTS = [
             { id: 'first_step', icon: '🌱', title: 'Первый шаг', desc: 'Выучить 1 слово (довести до «На повторении»)', category: 'Объём', check: (g) => g.learnedCount >= 1 },
             { id: 'novice', icon: '📗', title: 'Новичок', desc: '10 слов на повторении', category: 'Объём', check: (g) => g.learnedCount >= 10 },
@@ -1116,40 +1153,40 @@
                 <div class="scrollable-content px-1 pt-2 pb-4">
                     <h2 class="text-xl font-semibold mb-3">Статистика</h2>
                     <div class="grid grid-cols-2 gap-3 mb-3">
-                        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 text-center">
+                        <div class="stat-card">
                             <div class="text-3xl font-bold text-teal-600">${g.total}</div>
-                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">всего слов</div>
+                            <div class="stat-label">всего слов</div>
                         </div>
-                        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 text-center">
+                        <div class="stat-card">
                             <div class="text-3xl font-bold text-orange-500">🔥 ${streak}</div>
-                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">дней подряд</div>
+                            <div class="stat-label">дней подряд</div>
                         </div>
-                        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 text-center">
+                        <div class="stat-card">
                             <div class="text-3xl font-bold text-emerald-500">${g.percentCorrect !== null ? g.percentCorrect + '%' : '—'}</div>
-                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">верных ответов</div>
+                            <div class="stat-label">верных ответов</div>
                         </div>
-                        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 text-center">
+                        <div class="stat-card">
                             <div class="text-3xl font-bold text-indigo-500">${g.avgStability !== null ? g.avgStability.toFixed(1) : '—'}</div>
-                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">сред. стабильность</div>
+                            <div class="stat-label">сред. стабильность</div>
                         </div>
-                        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 text-center">
+                        <div class="stat-card">
                             <div class="text-3xl font-bold text-purple-500">${g.maxConsecutiveCorrect}</div>
-                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">макс. серия</div>
+                            <div class="stat-label">макс. серия</div>
                         </div>
-                        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 text-center">
+                        <div class="stat-card">
                             <div class="text-3xl font-bold text-rose-500">${today ? today.total : 0}</div>
-                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">повторений сегодня</div>
+                            <div class="stat-label">повторений сегодня</div>
                         </div>
-                        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 text-center">
+                        <div class="stat-card">
                             <div class="text-3xl font-bold text-blue-500">${g.totalFlips || 0}</div>
-                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">переворотов</div>
+                            <div class="stat-label">переворотов</div>
                         </div>
-                        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 text-center">
+                        <div class="stat-card">
                             <div class="text-3xl font-bold text-amber-500">${g.totalImages}</div>
-                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">фото</div>
+                            <div class="stat-label">фото</div>
                         </div>
                     </div>
-                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 mb-3">
+                    <div class="panel">
                         <div class="font-semibold text-base mb-3">По статусу</div>
                         <div class="space-y-2 text-sm">
                             <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Новые</span><span class="font-medium">${g.statNew}</span></div>
@@ -1183,8 +1220,7 @@
             const card = folder.cards.find(c => c.id === editingCardId);
             if (!card || !confirm('Переместить эту карточку в «Изученные слова»?')) return;
             await moveCardToMastered(card);
-            hideEditModal();
-            showFolderCards(currentFolderId);
+            closeEditModalAndReturn();
         }
 
         async function returnCardFromMastered(cardId) {
@@ -1200,7 +1236,7 @@
             modal.className = 'fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[110]';
             modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
             let html = `
-                <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6">
+                <div onclick="event.stopImmediatePropagation()" class="modal-panel-sm">
                     <div class="font-semibold text-xl mb-4">Вернуть в колоду</div>
                     <div class="space-y-2">
             `;
@@ -1215,7 +1251,7 @@
             });
             html += `
                     </div>
-                    <button onclick="this.closest('.fixed').remove()" class="mt-4 w-full py-3 rounded-2xl border border-slate-300 dark:border-slate-600 text-base touch-target">Отмена</button>
+                    <button onclick="this.closest('.fixed').remove()" class="btn-cancel-block">Отмена</button>
                 </div>
             `;
             modal.innerHTML = html;
@@ -1237,8 +1273,7 @@
             targetFolder.cards.push(card);
             await saveData();
             modal.remove();
-            hideEditModal();
-            showFolderCards(currentFolderId);
+            closeEditModalAndReturn();
         }
 
         function shouldSuggestMastered(card) {
@@ -1250,88 +1285,6 @@
             if (card.masteredSuggestionDismissed) return false;
             if (card.lastGrade === 1) return false;
             return true;
-        }
-
-        function getSuggestionLevel(card) {
-            if (!card || !card.stability) return 'none';
-            if (card.stability >= 28) return 'high';
-            if (card.stability >= 25) return 'medium';
-            return 'none';
-        }
-
-        function showMasteredSuggestion(card, cardIndex) {
-            const oldSuggestion = document.getElementById('mastered-suggestion');
-            if (oldSuggestion) oldSuggestion.remove();
-
-            const level = getSuggestionLevel(card);
-            const isHigh = level === 'high';
-            const stabilityText = `Стабильность: ${Math.round(card.stability)} дней`;
-
-            const container = document.getElementById('main-content');
-
-            const div = document.createElement('div');
-            div.id = 'mastered-suggestion';
-            div.className = `mt-4 mx-1 p-4 rounded-2xl border ${
-                isHigh 
-                    ? 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-300 dark:border-emerald-700' 
-                    : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
-            }`;
-
-            div.innerHTML = `
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                        <div class="font-semibold text-emerald-700 dark:text-emerald-300">
-                            ${isHigh ? 'Слово хорошо закрепилось' : 'Слово уже стабильное'}
-                        </div>
-                        <div class="text-sm text-emerald-600 dark:text-emerald-400">${stabilityText}</div>
-                        <div class="text-xs text-emerald-500 dark:text-emerald-500 mt-1">Можно перенести в архив, чтобы не повторять часто</div>
-                    </div>
-                    
-                    <div class="flex flex-wrap gap-2">
-                        <button onclick="acceptMasteredSuggestion(${cardIndex})" 
-                                class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition-colors touch-target">
-                            В архив
-                        </button>
-                        
-                        <button onclick="dismissMasteredSuggestion(${cardIndex}, false)" 
-                                class="px-4 py-2 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 rounded-xl text-sm touch-target">
-                            Пока нет
-                        </button>
-                        
-                        <button onclick="dismissMasteredSuggestion(${cardIndex}, true)" 
-                                class="px-3 py-2 text-xs text-emerald-600 hover:text-red-500 transition-colors touch-target">
-                            Больше не предлагать
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            container.appendChild(div);
-        }
-
-        async function acceptMasteredSuggestion(cardIndex) {
-            const card = dueCards[cardIndex];
-            if (!card) return;
-            await moveCardToMastered(card);
-            dueCards.splice(cardIndex, 1);
-            initialDueCount--;
-            document.getElementById('mastered-suggestion')?.remove();
-            lastReviewedCard = null;
-            const undoBtn = document.getElementById('undo-review-btn');
-            if (undoBtn) undoBtn.classList.remove('visible');
-            showCurrentCard();
-        }
-
-        async function dismissMasteredSuggestion(cardIndex, permanently) {
-            const card = dueCards[cardIndex];
-            if (!card) return;
-            if (permanently) {
-                card.masteredSuggestionDismissed = true;
-                await saveData();
-            }
-            document.getElementById('mastered-suggestion')?.remove();
-            if (cardIndex === currentCardIndex) currentCardIndex++;
-            showCurrentCard();
         }
 
         async function markCurrentCardAsMastered() {
@@ -1691,15 +1644,15 @@
             modal.className = 'fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]';
             modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
             modal.innerHTML = `
-                <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6">
+                <div onclick="event.stopImmediatePropagation()" class="modal-panel-sm">
                     <div class="font-semibold text-xl mb-4">Переименовать колоду</div>
                     <div class="mb-4">
                         <label class="block text-sm mb-1">Новое название</label>
                         <input type="text" id="rename-input" value="${escapeHtml(folder.name)}" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-base touch-target">
                     </div>
                     <div class="flex gap-3">
-                        <button onclick="this.closest('.fixed').remove()" class="flex-1 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-base touch-target">Отмена</button>
-                        <button onclick="saveRenamedFolder('${folderId}', this)" class="flex-1 py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target">Сохранить</button>
+                        <button onclick="this.closest('.fixed').remove()" class="btn-secondary-half">Отмена</button>
+                        <button onclick="saveRenamedFolder('${folderId}', this)" class="btn-primary-half">Сохранить</button>
                     </div>
                 </div>
             `;
@@ -1778,7 +1731,7 @@
                 const timeInfo = getTimeUntilNextReview(folder.cards);
                 const container = document.getElementById('main-content');
                 let html = `
-                    <div class="scrollable-content flex items-center justify-center px-4">
+                    <div class="empty-state">
                         <div class="text-center py-6">
                             <i class="fa-solid fa-clock text-5xl text-slate-300 dark:text-slate-600 mb-4"></i>
                             <h2 class="text-xl font-semibold mb-2">Пока нет слов для повторения</h2>
@@ -1798,7 +1751,7 @@
             } else {
                 const container = document.getElementById('main-content');
                 container.innerHTML = `
-                    <div class="scrollable-content flex items-center justify-center px-4">
+                    <div class="empty-state">
                         <div class="text-center py-6">
                             <p class="text-lg mb-3">В этой колоде пока нет слов</p>
                             <button onclick="showAddCardModal()" class="px-5 py-3 bg-teal-600 text-white rounded-2xl text-base touch-target">Добавить первое слово</button>
@@ -1811,12 +1764,18 @@
         }
 
         function showCurrentCard() {
+            // Освобождаем Object URL предыдущей карточки
+            if (currentCardIndex > 0 && dueCards[currentCardIndex - 1]?._imageObjectUrl) {
+                URL.revokeObjectURL(dueCards[currentCardIndex - 1]._imageObjectUrl);
+                dueCards[currentCardIndex - 1]._imageObjectUrl = null;
+            }
+
             const undoBtn = document.getElementById('undo-review-btn');
 
             if (currentCardIndex >= dueCards.length) {
                 const container = document.getElementById('main-content');
                 container.innerHTML = `
-                    <div class="scrollable-content flex items-center justify-center px-4">
+                    <div class="empty-state">
                         <div class="text-center py-6">
                             <i class="fa-solid fa-check-circle text-5xl text-emerald-500 mb-3"></i>
                             <p class="text-xl font-semibold">Отлично! Все карточки повторены.</p>
@@ -1871,11 +1830,9 @@
                         <img id="study-card-image" 
                              onclick="uploadImageForCurrentCard(event)" 
                              class="w-full max-h-36 object-contain rounded-2xl cursor-pointer">
-                        <button onclick="event.stopImmediatePropagation(); removeImageFromCurrentCard()" 
-                                class="absolute top-1 right-1 w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg text-sm">✕</button>
                     </div>`;
             } else {
-                imageHtml = `<div onclick="uploadImageForCurrentCard(event)" class="image-placeholder">
+                imageHtml = `<div id="study-image-container" onclick="uploadImageForCurrentCard(event)" class="image-placeholder">
                      <i class="fa-solid fa-camera text-lg"></i>
                      <span>Добавить фото</span>
                    </div>`;
@@ -1887,6 +1844,10 @@
                     ${progressHtml}
                     <div class="study-card-wrapper">
                         <div class="study-card card-enter" onclick="flipStudyCard()">
+                            <button onclick="editCurrentStudyCard(event)"
+                                    class="absolute top-3 right-3 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 touch-target">
+                                <i class="fa-solid fa-ellipsis-vertical text-xl"></i>
+                            </button>
                             ${imageHtml}
                             <div id="card-front">
                                 <div class="word-english">${escapeHtml(card.english)}</div>
@@ -1905,32 +1866,38 @@
                         <button onclick="rateCard(3)" class="rating-btn bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400">Хорошо<br><span class="text-xs opacity-70">Нормально</span></button>
                         <button onclick="rateCard(4)" class="rating-btn bg-teal-600 text-white">Легко<br><span class="text-xs opacity-80">Сразу вспомнил</span></button>
                     </div>
-                    <div class="flex justify-between px-2 pb-2 mt-1">
-                        <button onclick="markCurrentCardAsMastered()" class="text-xs text-emerald-600 hover:text-emerald-700 flex items-center gap-x-1 touch-target">
-                            <i class="fa-solid fa-trophy"></i> <span>В архив</span>
-                        </button>
-                        <button onclick="resetCurrentCard()" class="text-xs text-red-500 hover:text-red-600 flex items-center gap-x-1 touch-target">
-                            <i class="fa-solid fa-undo"></i> <span>Сбросить</span>
-                        </button>
-                    </div>
                 </div>
             `;
 
             // Подгружаем изображение после отрисовки
-            if (card.imageId || (card.image && card.image.startsWith('data:image'))) {
-                (async () => {
-                    const src = await getCardImageSrc(card);
-                    const imgEl = document.getElementById('study-card-image');
-                    if (imgEl) {
-                        if (src) {
-                            imgEl.src = src;
-                            card._imageObjectUrl = src; // сохраняем для revokeObjectURL
-                        } else {
-                            // Изображение недоступно (кэш очищен)
-                            imgEl.style.display = 'none';
-                            const container = document.getElementById('study-image-container');
-                            if (container) {
-                                container.innerHTML = `
+            const imgContainer = document.getElementById('study-image-container');
+            if (imgContainer) {
+                // long-press меню для фото
+                let pressTimer = null;
+                const startPress = (e) => {
+                    pressTimer = setTimeout(() => {
+                        showImageActionMenu(card);
+                    }, 550);
+                };
+                const cancelPress = () => { clearTimeout(pressTimer); };
+                imgContainer.addEventListener('touchstart', startPress, { passive: true });
+                imgContainer.addEventListener('touchend', cancelPress);
+                imgContainer.addEventListener('touchmove', cancelPress);
+                imgContainer.addEventListener('mousedown', startPress);
+                imgContainer.addEventListener('mouseup', cancelPress);
+                imgContainer.addEventListener('mouseleave', cancelPress);
+
+                if (card.imageId || (card.image && card.image.startsWith('data:image'))) {
+                    (async () => {
+                        const src = await getCardImageSrc(card);
+                        const imgEl = document.getElementById('study-card-image');
+                        if (imgEl) {
+                            if (src) {
+                                imgEl.src = src;
+                                card._imageObjectUrl = src;
+                            } else {
+                                imgEl.style.display = 'none';
+                                imgContainer.innerHTML = `
                                     <div class="image-placeholder">
                                         <i class="fa-solid fa-image-slash text-lg"></i>
                                         <span>Изображение недоступно</span>
@@ -1938,8 +1905,8 @@
                                 `;
                             }
                         }
-                    }
-                })();
+                    })();
+                }
             }
 
             if (undoBtn) {
@@ -1947,6 +1914,63 @@
                 if (lastReviewedCard) undoBtn.classList.add('visible');
                 else undoBtn.classList.remove('visible');
             }
+        }
+
+        // --- Меню действий с изображением (long-press) ---
+        function showImageActionMenu(card) {
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[200]';
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+            overlay.innerHTML = `
+                <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[320px] rounded-t-3xl sm:rounded-3xl p-2">
+                    <div class="py-2 px-4 text-sm text-slate-500 dark:text-slate-400">Действия с фото</div>
+                    <button onclick="changeCardImage('${card.id}'); this.closest('.fixed').remove();" 
+                            class="menu-item">
+                        <i class="fa-solid fa-edit w-5 text-teal-600"></i> 
+                        <span>${card.imageId ? 'Изменить фото' : 'Добавить фото'}</span>
+                    </button>
+                    ${card.imageId ? `
+                    <button onclick="removeCardImage('${card.id}'); this.closest('.fixed').remove();" 
+                            class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target text-red-600">
+                        <i class="fa-solid fa-trash w-5"></i> 
+                        <span>Удалить фото</span>
+                    </button>` : ''}
+                    <button onclick="this.closest('.fixed').remove()" class="mt-2 w-full py-3 text-sm text-slate-500 dark:text-slate-400 touch-target">Отмена</button>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        async function changeCardImage(cardId) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = async () => {
+                if (!input.files[0]) return;
+                const folder = getCurrentFolder();
+                const card = folder.cards.find(c => c.id === cardId);
+                if (!card) return;
+                await compressAndSetImage(card, input.files[0]);
+                await debouncedSaveData();
+                if (dueCards.some(c => c.id === cardId)) showCurrentCard();
+                else showFolderCards(currentFolderId);
+            };
+            input.click();
+        }
+
+        async function removeCardImage(cardId) {
+            if (!confirm('Удалить фото?')) return;
+            const folder = getCurrentFolder();
+            const card = folder.cards.find(c => c.id === cardId);
+            if (!card) return;
+            if (card.imageId) await MediaStore.deleteImage(card.imageId);
+            if (card._imageObjectUrl) { URL.revokeObjectURL(card._imageObjectUrl); card._imageObjectUrl = null; }
+            card.image = null;
+            card.imageId = null;
+            await debouncedSaveData();
+            if (dueCards.some(c => c.id === cardId)) showCurrentCard();
+            else showFolderCards(currentFolderId);
         }
 
         function speakCurrentWord() {
@@ -2046,9 +2070,13 @@
             const card = dueCards[currentCardIndex];
             if (!card) return;
 
+            // Сохраняем полный снимок сессии для отмены
             lastReviewedCard = {
                 card: JSON.parse(JSON.stringify(card)),
-                index: currentCardIndex
+                index: currentCardIndex,
+                statsSnapshot: JSON.parse(JSON.stringify(stats)),
+                dueCardsSnapshot: JSON.parse(JSON.stringify(dueCards)),
+                initialDueCountSnapshot: initialDueCount
             };
 
             if (navigator.vibrate) navigator.vibrate(10);
@@ -2096,7 +2124,7 @@
 
             if (navigator.vibrate) navigator.vibrate(10);
 
-            const { card: savedCard, index } = lastReviewedCard;
+            const { card: savedCard, index, statsSnapshot, dueCardsSnapshot, initialDueCountSnapshot } = lastReviewedCard;
             const folder = getCurrentFolder();
             let realCard = folder.cards.find(c => c.id === savedCard.id);
 
@@ -2113,6 +2141,20 @@
                 Object.assign(realCard, savedCard);
             }
 
+            // Восстанавливаем статистику
+            if (statsSnapshot) {
+                Object.assign(stats, statsSnapshot);
+                await saveStats();
+            }
+
+            // Восстанавливаем список dueCards и счётчик
+            if (dueCardsSnapshot) {
+                dueCards = dueCardsSnapshot;
+            }
+            if (initialDueCountSnapshot !== undefined) {
+                initialDueCount = initialDueCountSnapshot;
+            }
+
             currentCardIndex = index;
             lastReviewedCard = null;
 
@@ -2126,25 +2168,46 @@
             await saveData();
         }
 
-        async function resetCurrentCard() {
-            if (!confirm('Сбросить прогресс этой карточки?')) return;
+        // Троеточие на карточке в режиме изучения — открывает ту же модалку
+        // редактирования, что и в списке колоды (правка, сброс прогресса, архив, удаление — всё в одном месте).
+        function editCurrentStudyCard(event) {
+            if (event) event.stopImmediatePropagation();
             const card = dueCards[currentCardIndex];
             if (!card) return;
-            const folder = getCurrentFolder();
-            const realCard = folder.cards.find(c => c.id === card.id);
-            if (!realCard) return;
-            resetCardProgress(realCard);
-            Object.assign(card, realCard);
-            await saveData();
-            showCurrentCard();
+            editCard(card.id, 'study');
+        }
+
+        // Возврат после закрытия модалки редактирования — туда, откуда её открыли.
+        // Если карточку редактировали во время изучения, обновляем её прямо в текущей сессии,
+        // а если она пропала из текущей колоды (удалена/перенесена в архив) — убираем из очереди.
+        function closeEditModalAndReturn() {
+            hideEditModal();
+            if (editContext === 'study') {
+                const folder = getCurrentFolder();
+                const dueIndex = dueCards.findIndex(c => c.id === editingCardId);
+                const stillInFolder = folder.cards.find(c => c.id === editingCardId);
+                if (dueIndex !== -1) {
+                    if (stillInFolder) {
+                        Object.assign(dueCards[dueIndex], stillInFolder);
+                    } else {
+                        dueCards.splice(dueIndex, 1);
+                        if (dueIndex < currentCardIndex) currentCardIndex--;
+                        if (initialDueCount > 0) initialDueCount--;
+                    }
+                }
+                showCurrentCard();
+            } else {
+                showFolderCards(currentFolderId);
+            }
         }
 
         // ==================== РЕДАКТИРОВАНИЕ ====================
-        function editCard(cardId) {
+        function editCard(cardId, context = 'folder') {
             const folder = getCurrentFolder();
             const card = folder.cards.find(c => c.id === cardId);
             if (!card) return;
             editingCardId = cardId;
+            editContext = context;
 
             document.getElementById('edit-english').value = card.english;
             document.getElementById('edit-russian').value = card.russian;
@@ -2191,8 +2254,7 @@
             const dateVal = document.getElementById('edit-next-date').value;
             if (dateVal) card.nextReviewDate = new Date(dateVal).toISOString();
             await saveData();
-            hideEditModal();
-            showFolderCards(currentFolderId);
+            closeEditModalAndReturn();
         }
 
         async function deleteCurrentCard() {
@@ -2212,8 +2274,7 @@
 
             folder.cards = folder.cards.filter(c => c.id !== editingCardId);
             await debouncedSaveData();
-            hideEditModal();
-            showFolderCards(currentFolderId);
+            closeEditModalAndReturn();
         }
 
         async function resetCardProgressFromModal() {
@@ -2223,8 +2284,7 @@
             if (!card) return;
             resetCardProgress(card);
             await saveData();
-            hideEditModal();
-            showFolderCards(currentFolderId);
+            closeEditModalAndReturn();
         }
 
         // ==================== ИЗОБРАЖЕНИЯ ====================
@@ -2260,28 +2320,6 @@
             input.click();
         }
 
-        async function removeImageFromCurrentCard() {
-            if (!confirm('Удалить картинку?')) return;
-
-            const card = dueCards[currentCardIndex];
-            if (!card) return;
-
-            if (card.imageId) {
-                await MediaStore.deleteImage(card.imageId);
-            }
-
-            if (card._imageObjectUrl) {
-                URL.revokeObjectURL(card._imageObjectUrl);
-                card._imageObjectUrl = null;
-            }
-
-            card.image = null;
-            card.imageId = null;
-
-            await debouncedSaveData();
-            showCurrentCard();
-        }
-
         // ==================== ДОБАВЛЕНИЕ / ИМПОРТ ====================
         function showAddCardModal() {
             document.getElementById('new-english').value = '';
@@ -2298,43 +2336,194 @@
         async function addNewCard() {
             const english = document.getElementById('new-english').value.trim();
             const russian = document.getElementById('new-russian').value.trim();
-            if (!english || !russian) return alert('Заполните оба поля');
+            const isReversible = document.getElementById('is-reversible')?.checked || false;
+
+            if (!english || !russian) return alert('Пожалуйста, заполните обе стороны карточки');
+
             const folder = getCurrentFolder();
-            folder.cards.push({
-                id: 'card_' + Date.now(),
-                english, russian,
+
+            // Основная карточка
+            const card = {
+                id: 'card_' + Date.now() + Math.random(),
+                english: english,
+                russian: russian,
                 image: null,
+                imageId: null,
                 ...makeFreshCardProgress()
-            });
+            };
+            folder.cards.push(card);
+
+            // Реверсивная карточка
+            if (isReversible) {
+                const reverseCard = {
+                    id: 'card_' + Date.now() + Math.random(),
+                    english: russian,
+                    russian: english,
+                    image: null,
+                    imageId: null,
+                    ...makeFreshCardProgress()
+                };
+                folder.cards.push(reverseCard);
+            }
+
             await saveData();
             hideAddCardModal();
             showFolderCards(currentFolderId);
+        }
+
+        // --- Улучшенный парсер импорта (три уровня) ---
+        function parseImportText(text) {
+            if (!text || typeof text !== 'string') return [];
+            const trimmedText = text.trim();
+            if (!trimmedText) return [];
+
+            const cards = [];
+
+            // Уровень 1: Front: / Back:
+            if (/^Front:/im.test(trimmedText) && /^Back:/im.test(trimmedText)) {
+                const blocks = trimmedText.split(/\n\s*\n/);
+                for (const block of blocks) {
+                    const lines = block.trim().split('\n');
+                    let front = '', back = '', current = '';
+                    for (const line of lines) {
+                        const t = line.trim();
+                        if (t.startsWith('Front:')) { current = 'front'; front = t.replace(/^Front:\s*/, ''); }
+                        else if (t.startsWith('Back:')) { current = 'back'; back = t.replace(/^Back:\s*/, ''); }
+                        else if (current === 'front') front += '\n' + t;
+                        else if (current === 'back') back += '\n' + t;
+                    }
+                    if (front.trim() && back.trim()) cards.push({ english: front.trim(), russian: back.trim() });
+                }
+                if (cards.length) return cards;
+            }
+
+            // Уровень 2: классические разделители
+            const lines = trimmedText.split(/\r?\n/);
+            for (const line of lines) {
+                const t = line.trim();
+                if (!t) continue;
+                const seps = [' — ', ' – ', ' - ', ' : ', ' → ', ' => '];
+                let found = false;
+                for (const sep of seps) {
+                    const idx = t.indexOf(sep);
+                    if (idx !== -1) {
+                        const eng = t.substring(0, idx).trim();
+                        const rus = t.substring(idx + sep.length).trim();
+                        if (eng && rus) { cards.push({ english: eng, russian: rus }); found = true; break; }
+                    }
+                }
+                if (!found && t.includes('\t')) {
+                    const parts = t.split('\t');
+                    if (parts.length >= 2 && parts[0].trim() && parts[1].trim())
+                        cards.push({ english: parts[0].trim(), russian: parts[1].trim() });
+                }
+            }
+            if (cards.length) return cards;
+
+            // Уровень 3: пустые строки
+            let i = 0;
+            while (i < lines.length) {
+                while (i < lines.length && lines[i].trim() === '') i++;
+                if (i >= lines.length) break;
+                const eng = lines[i].trim(); i++;
+                while (i < lines.length && lines[i].trim() === '') i++;
+                if (i >= lines.length) break;
+                const rus = lines[i].trim(); i++;
+                if (eng && rus) cards.push({ english: eng, russian: rus });
+            }
+            return cards;
+        }
+
+        // --- Функции для безопасного импорта ---
+        function regenerateImportedIds(importedFolders) {
+            importedFolders.forEach(folder => {
+                folder.id = 'folder_' + Date.now() + Math.random();
+                if (folder.cards) {
+                    folder.cards.forEach(card => {
+                        card.id = 'card_' + Date.now() + Math.random();
+                    });
+                }
+            });
+        }
+
+        function deduplicateSystemFolders() {
+            const systemFolders = folders.filter(f => f.system);
+            if (systemFolders.length <= 1) return;
+
+            const main = systemFolders[0];
+            for (let i = 1; i < systemFolders.length; i++) {
+                const extra = systemFolders[i];
+                if (extra.cards?.length) {
+                    main.cards.push(...extra.cards);
+                }
+                folders = folders.filter(f => f.id !== extra.id);
+            }
         }
 
         async function importWords() {
             const text = document.getElementById('import-text').value.trim();
             const folderId = document.getElementById('import-folder-select').value;
             const folder = folders.find(f => f.id === folderId);
-            if (!text || !folder) return;
-            let count = 0;
-            text.split('\n').forEach(line => {
-                const parts = line.split(/[-–—:]/).map(p => p.trim());
-                if (parts.length >= 2) {
-                    folder.cards.push({
-                        id: 'card_' + Date.now() + Math.random(),
-                        english: parts[0],
-                        russian: parts[1],
-                        image: null,
-                        ...makeFreshCardProgress()
-                    });
-                    count++;
-                }
-            });
+            if (!text || !folder) return alert('Введите текст и выберите колоду');
+
+            const newCards = parseImportText(text);
+            if (newCards.length === 0) {
+                return alert('Не удалось распознать ни одной карточки. Проверьте формат.');
+            }
+
+            const cardsToAdd = newCards.map(c => ({
+                id: 'card_' + Date.now() + Math.random(),
+                english: c.english,
+                russian: c.russian,
+                image: null,
+                imageId: null,
+                ...makeFreshCardProgress()
+            }));
+
+            folder.cards.push(...cardsToAdd);
             await saveData();
             document.getElementById('import-text').value = '';
-            alert(`Импортировано ${count} слов`);
+            alert(`Импортировано ${cardsToAdd.length} слов`);
             showFolderCards(folderId);
             await checkAchievements();
+        }
+
+        // --- Кнопка "Как импортировать" ---
+        function showImportHelpModal() {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]';
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+            modal.innerHTML = `
+                <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[520px] rounded-t-3xl sm:rounded-3xl p-6">
+                    <div class="font-semibold text-xl mb-4">Как быстро импортировать много слов</div>
+                    <div class="text-sm text-slate-600 dark:text-slate-300 space-y-3">
+                        <p><strong>Рекомендуемый способ:</strong></p>
+                        <ol class="list-decimal pl-5 space-y-1">
+                            <li>Скопируй список слов.</li>
+                            <li>Открой ChatGPT, Claude или Grok.</li>
+                            <li>Вставь этот промпт:</li>
+                        </ol>
+                        <pre class="bg-slate-100 dark:bg-slate-700 p-3 rounded-xl text-xs overflow-auto">Приведи список к этому формату:
+
+Front: [слово/фраза]
+Back: [перевод]
+
+Пример:
+Front: Hello
+Back: Привет
+
+Front: Beautiful
+Back: Красивый</pre>
+                        <p>4. Скопируй результат и вставь в поле импорта.</p>
+                    </div>
+                    <button onclick="this.closest('.fixed').remove()" 
+                            class="mt-6 w-full py-3 rounded-2xl bg-teal-600 text-white font-medium text-base touch-target">
+                        Понятно
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(modal);
         }
 
         function editCardFromSearch(folderId, cardId) {
@@ -2345,6 +2534,11 @@
         // ==================== ЭКСПОРТ ====================
         function exportAllData() {
             if (folders.length === 0) return alert('Нет данных для экспорта');
+            alert(
+                '❗️ В экспорт попадают только текстовые данные (слова и переводы).\n\n' +
+                'Изображения и статистика не сохраняются. При переносе на другое устройство ' +
+                'изображения придётся добавить заново.'
+            );
             const data = JSON.stringify(folders, null, 2);
             const a = document.createElement('a');
             a.href = URL.createObjectURL(new Blob([data], {type: 'application/json'}));
@@ -2361,12 +2555,10 @@
                     throw new Error('Файл должен содержать массив колод');
                 }
 
-                // Проверка структуры
                 if (imported.some(f => !f.id || !f.name || !Array.isArray(f.cards))) {
                     throw new Error('Неверный формат данных (отсутствуют обязательные поля)');
                 }
 
-                // Спрашиваем пользователя
                 const shouldReplace = confirm(
                     'Заменить все текущие данные?\n\n' +
                     'OK — заменить все данные\n' +
@@ -2376,12 +2568,16 @@
                 if (shouldReplace) {
                     folders = imported;
                 } else {
+                    // Перегенерируем ID, чтобы избежать конфликтов
+                    regenerateImportedIds(imported);
                     folders = folders.concat(imported);
                 }
 
-                // Валидация и исправление данных
-                validateAndRepairData();
+                // Удаляем дублирующиеся системные папки
+                deduplicateSystemFolders();
 
+                validateAndRepairData();
+                await migrateOldBase64Images();
                 await saveData();
                 alert('Данные успешно импортированы');
                 showFoldersView();
@@ -2413,9 +2609,9 @@
                 <div class="scrollable-content px-1 pt-2 pb-4">
                     <h2 class="text-xl font-semibold mb-3">Настройки</h2>
 
-                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 mb-3">
+                    <div class="panel">
                         <div class="font-semibold text-base mb-3">Колоды</div>
-                        <button onclick="createFolder()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
+                        <button onclick="createFolder()" class="menu-item">
                             <i class="fa-solid fa-plus w-5 text-teal-600"></i> <span>Создать колоду</span>
                         </button>
                         <button onclick="showDeleteFolderModal()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-red-600 text-base touch-target">
@@ -2423,7 +2619,7 @@
                         </button>
                     </div>
 
-                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 mb-3">
+                    <div class="panel">
                         <div class="font-semibold text-base mb-3">Лимит повторений</div>
                         <label class="flex items-center gap-3 cursor-pointer mb-2">
                             <input type="checkbox" id="limit-toggle" ${dailyLimitEnabled ? 'checked' : ''} onchange="toggleLimit(this.checked)" class="w-5 h-5 accent-teal-600">
@@ -2435,18 +2631,25 @@
                         </div>
                     </div>
 
-                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 mb-3">
-                        <div class="font-semibold text-base mb-3">Импорт слов (текстом)</div>
+                    <div class="panel">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="font-semibold text-base">Импорт слов</div>
+                            <button onclick="showImportHelpModal()" 
+                                    class="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-x-1 touch-target">
+                                <i class="fa-solid fa-info-circle"></i>
+                                <span>Как импортировать</span>
+                            </button>
+                        </div>
                         <div class="mb-3"><label class="block text-sm mb-1">Колода</label>
                             <select id="import-folder-select" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 touch-target">
                                 ${folders.map(f => `<option value="${f.id}" ${f.id === currentFolderId ? 'selected' : ''}>${escapeHtml(f.name)}</option>`).join('')}
                             </select>
                         </div>
-                        <textarea id="import-text" placeholder="beautiful - красивый&#10;hello - привет" class="w-full h-28 p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 font-mono text-sm"></textarea>
+                        <textarea id="import-text" placeholder="Вставьте слова или предложения в любом поддерживаемом формате" class="w-full h-28 p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 font-mono text-sm"></textarea>
                         <button onclick="importWords()" class="w-full mt-3 py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target">Импортировать</button>
                     </div>
 
-                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 mb-3">
+                    <div class="panel">
                         <div class="font-semibold text-base mb-3">Резервное копирование</div>
                         <button onclick="exportAllData()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target mb-1">
                             <i class="fa-solid fa-file-export w-5 text-teal-600"></i> <span>Экспорт всех данных</span>
@@ -2456,22 +2659,22 @@
                         <button onclick="importFromFile()" class="w-full mt-2 py-3 rounded-xl bg-indigo-600 text-white font-medium text-base touch-target">Загрузить</button>
                     </div>
 
-                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 mb-3">
+                    <div class="panel">
                         <div class="font-semibold text-base mb-3">Сброс прогресса</div>
-                        <button onclick="showResetFolderSelectionModal()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
+                        <button onclick="showResetFolderSelectionModal()" class="menu-item">
                             <i class="fa-solid fa-undo w-5 text-amber-500"></i> <span>Сбросить прогресс выбранной колоды</span>
                         </button>
-                        <button onclick="resetAllProgress()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
+                        <button onclick="resetAllProgress()" class="menu-item">
                             <i class="fa-solid fa-xmark w-5 text-slate-800 dark:text-slate-200"></i> <span>Сбросить прогресс всех колод</span>
                         </button>
                     </div>
 
                     <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4">
                         <div class="font-semibold text-base mb-3">Статистика и достижения</div>
-                        <button onclick="resetAchievements()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
+                        <button onclick="resetAchievements()" class="menu-item">
                             <i class="fa-solid fa-trophy w-5 text-amber-500"></i> <span>Сбросить все достижения</span>
                         </button>
-                        <button onclick="resetAllStats()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target">
+                        <button onclick="resetAllStats()" class="menu-item">
                             <i class="fa-solid fa-eraser w-5 text-red-500"></i> <span>Сбросить всю статистику и достижения</span>
                         </button>
                     </div>
@@ -2577,7 +2780,7 @@
             modal.className = 'fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]';
             modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
             modal.innerHTML = `
-                <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6">
+                <div onclick="event.stopImmediatePropagation()" class="modal-panel-sm">
                     <div class="font-semibold text-xl mb-4">Выберите колоду для удаления</div>
                     ${deletable.map(f => `
                         <button onclick="confirmDeleteFolder('${f.id}'); this.closest('.fixed').remove()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 flex justify-between mb-1 text-base touch-target">
@@ -2585,7 +2788,7 @@
                             <span class="text-xs text-slate-400">${f.cards.length} слов</span>
                         </button>
                     `).join('')}
-                    <button onclick="this.closest('.fixed').remove()" class="mt-4 w-full py-3 rounded-2xl border border-slate-300 dark:border-slate-600 text-base touch-target">Отмена</button>
+                    <button onclick="this.closest('.fixed').remove()" class="btn-cancel-block">Отмена</button>
                 </div>
             `;
             document.body.appendChild(modal);
@@ -2602,6 +2805,15 @@
                 alert('Папку «Изученные слова» нельзя удалить — в ней хранится прогресс по выученным словам.');
                 return;
             }
+
+            // Удаляем связанные изображения
+            if (folder && folder.cards) {
+                for (const card of folder.cards) {
+                    if (card._imageObjectUrl) URL.revokeObjectURL(card._imageObjectUrl);
+                    if (card.imageId) await MediaStore.deleteImage(card.imageId);
+                }
+            }
+
             folders = folders.filter(f => f.id !== folderId);
             if (folders.length > 0) currentFolderId = folders[0].id;
             await saveData();
@@ -2780,7 +2992,10 @@
             loadLimitSettings();
             initTheme();
 
-            await MediaStore.init();
+            const mediaAvailable = await MediaStore.init();
+            if (!mediaAvailable) {
+                console.warn('Cache API недоступен. Добавление изображений будет недоступно.');
+            }
             await migrateOldBase64Images();
 
             document.getElementById('current-folder-name').textContent = 'Мои колоды';
@@ -2790,6 +3005,7 @@
 
         // ==================== Защита от потери данных при закрытии вкладки ====================
         function flushPendingChanges() {
+            // Fallback-сохранение при beforeunload/pagehide (без await)
             try {
                 if (typeof saveData === 'function') {
                     saveData();
@@ -2799,14 +3015,21 @@
             }
         }
 
-        window.addEventListener('beforeunload', flushPendingChanges);
-        window.addEventListener('pagehide', flushPendingChanges);
-
-        document.addEventListener('visibilitychange', () => {
+        // Основной механизм сохранения при скрытии страницы (с await)
+        document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState === 'hidden') {
-                flushPendingChanges();
+                try {
+                    if (typeof saveData === 'function') {
+                        await saveData();
+                    }
+                } catch (e) {
+                    console.warn('Ошибка сохранения при скрытии страницы:', e);
+                }
             }
         });
+
+        window.addEventListener('beforeunload', flushPendingChanges);
+        window.addEventListener('pagehide', flushPendingChanges);
 
         window.onload = init;
     </script>
