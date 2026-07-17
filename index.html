@@ -83,9 +83,6 @@
             line-height: 1.3;
             width: 100%;
             white-space: pre-line;
-            /* Базовые размеры ниже — это стартовая точка. JS (fitStudyCardContent)
-               подбирает финальное значение через --word-font-english/--word-font-russian,
-               уменьшая текст (и картинку), если контент не помещается в карточку. */
         }
         .study-card .word-english { font-size: var(--word-font-english, 2.5rem); }
         .study-card .word-russian { font-size: var(--word-font-russian, 2rem); }
@@ -329,6 +326,9 @@
             </div>
             <details class="mt-3">
                 <summary class="cursor-pointer text-sm text-slate-500 dark:text-slate-400">Дополнительные параметры (FSRS)</summary>
+                <p class="text-xs text-amber-600 dark:text-amber-400 mt-2 mb-2">
+                    ⚠️ Изменение Stability и Difficulty может нарушить работу алгоритма повторений. Рекомендуется только опытным пользователям.
+                </p>
                 <div class="pt-3 grid grid-cols-2 gap-3">
                     <div><label class="block text-xs mb-1">Стабильность</label><input type="number" step="0.01" id="edit-stability" class="field-input"></div>
                     <div><label class="block text-xs mb-1">Сложность</label><input type="number" step="0.01" id="edit-difficulty" class="field-input"></div>
@@ -547,9 +547,10 @@
             }
         }
 
-        // ==================== Валидация данных после загрузки ====================
+        // ==================== Валидация данных после загрузки (ИСПРАВЛЕНА) ====================
         function validateAndRepairData() {
             let changed = false;
+            const now = new Date().toISOString();
 
             folders.forEach(folder => {
                 if (!Array.isArray(folder.cards)) {
@@ -558,25 +559,43 @@
                 }
 
                 folder.cards.forEach(card => {
-                    if (card.nextReviewDate && isNaN(new Date(card.nextReviewDate).getTime())) {
-                        card.nextReviewDate = new Date().toISOString();
-                        changed = true;
+                    let cardChanged = false;
+
+                    // 1. Если nextReviewDate отсутствует или некорректна — ставим на сегодня
+                    if (!card.nextReviewDate || isNaN(new Date(card.nextReviewDate).getTime())) {
+                        card.nextReviewDate = now;
+                        cardChanged = true;
                     }
 
-                    // Исправление: не применять safeStability/safeDifficulty к новым карточкам
-                    if (card.state !== 'new') {
-                        card.stability = safeStability(card.stability);
-                        card.difficulty = safeDifficulty(card.difficulty);
-                    } else {
-                        // Удаляем поля, чтобы они не мешали
+                    // 2. Определяем, выглядит ли карточка как "новая"
+                    const looksNew = (card.state === 'new') ||
+                                     ((card.reps || 0) === 0) ||
+                                     (card.stability === undefined || card.stability === null);
+
+                    if (looksNew) {
+                        // Принудительно делаем новой и due сегодня (как при текстовом импорте)
+                        card.state = 'new';
+                        card.reps = 0;
+                        card.lapses = card.lapses || 0;
                         delete card.stability;
                         delete card.difficulty;
+                        delete card.learningStep;
+                        card.last_review = null;
+                        card.nextReviewDate = now;
+                        card.masteredSuggestionDismissed = false;
+                        cardChanged = true;
+                    } else {
+                        // Для изученных — валидируем stability/difficulty
+                        card.stability = safeStability(card.stability);
+                        card.difficulty = safeDifficulty(card.difficulty);
                     }
 
                     if (!card.state) {
                         card.state = 'new';
-                        changed = true;
+                        cardChanged = true;
                     }
+
+                    if (cardChanged) changed = true;
                 });
             });
 
@@ -624,27 +643,34 @@
             migrateData();
         }
 
+        // ==================== MIGRATE (ИСПРАВЛЕНА) ====================
         function migrateData() {
             let changed = false;
+            // Находим существующую ручную системную папку (если она есть)
             let mastered = folders.find(f => f.name === 'Изученные слова' && f.system !== true);
             if (mastered) {
                 mastered.system = true;
                 changed = true;
-            } else if (!folders.some(f => f.system === true)) {
-                const newMastered = {
-                    id: 'mastered_' + Date.now(),
-                    name: 'Изученные слова',
-                    system: true,
-                    cards: []
-                };
-                folders.push(newMastered);
+            }
+            // НЕ создаём пустую папку «Изученные слова» автоматически.
+            // Она появится только при первом перемещении слова (через getMasteredFolder).
+
+            // Удаляем дублирующиеся системные папки (если вдруг их несколько)
+            const systemFolders = folders.filter(f => f.system === true);
+            if (systemFolders.length > 1) {
+                const main = systemFolders[0];
+                for (let i = 1; i < systemFolders.length; i++) {
+                    const extra = systemFolders[i];
+                    if (extra.cards?.length) {
+                        main.cards.push(...extra.cards);
+                    }
+                    folders = folders.filter(f => f.id !== extra.id);
+                }
                 changed = true;
             }
+
+            // Остальные миграции полей (lastGrade, masteredSuggestionDismissed)
             folders.forEach(folder => {
-                if (folder.system === undefined) {
-                    folder.system = false;
-                    changed = true;
-                }
                 folder.cards.forEach(card => {
                     if (card.lastGrade === undefined) {
                         card.lastGrade = undefined;
@@ -717,10 +743,17 @@
             return folders.find(f => f.id === currentFolderId) || folders[0];
         }
 
+        // ==================== ПОЛУЧЕНИЕ ПАПКИ «ИЗУЧЕННЫЕ СЛОВА» (ленивое создание) ====================
         function getMasteredFolder() {
             let mastered = folders.find(f => f.system === true);
             if (!mastered) {
-                mastered = { id: 'mastered_' + Date.now(), name: 'Изученные слова', system: true, cards: [] };
+                // Создаём только сейчас, когда действительно нужно (при перемещении первого слова)
+                mastered = {
+                    id: 'mastered_' + Date.now(),
+                    name: 'Изученные слова',
+                    system: true,
+                    cards: []
+                };
                 folders.push(mastered);
                 saveData();
             }
@@ -931,11 +964,35 @@
             card.masteredSuggestionDismissed = false;
         }
 
+        // ==================== ПОЛУЧЕНИЕ DUE-КАРТОЧЕК (ИСПРАВЛЕНА) ====================
         function getDueCards(folder) {
             const now = new Date();
             return folder.cards
-                .filter(card => new Date(card.nextReviewDate) <= now)
-                .sort((a, b) => new Date(a.nextReviewDate) - new Date(b.nextReviewDate));
+                .filter(card => {
+                    if (!card.nextReviewDate) return true;
+                    const d = new Date(card.nextReviewDate);
+                    return isNaN(d.getTime()) || d <= now;
+                })
+                .sort((a, b) => {
+                    const da = new Date(a.nextReviewDate || 0);
+                    const db = new Date(b.nextReviewDate || 0);
+                    return da - db;
+                });
+        }
+
+        function getDueCardsFromArray(cards) {
+            const now = new Date();
+            return cards
+                .filter(card => {
+                    if (!card.nextReviewDate) return true;
+                    const d = new Date(card.nextReviewDate);
+                    return isNaN(d.getTime()) || d <= now;
+                })
+                .sort((a, b) => {
+                    const da = new Date(a.nextReviewDate || 0);
+                    const db = new Date(b.nextReviewDate || 0);
+                    return da - db;
+                });
         }
 
         function getTimeUntilNextReview(cards) {
@@ -1479,6 +1536,31 @@
             return results;
         }
 
+        // ==================== РЕЖИМЫ ОБУЧЕНИЯ ====================
+        let studyMode = localStorage.getItem('studyMode') || 'all'; // 'all' | 'selected'
+        let selectedFolderId = localStorage.getItem('selectedFolderId') || null;
+
+        function setStudyMode(mode) {
+            studyMode = mode;
+            localStorage.setItem('studyMode', mode);
+            if (mode === 'all') {
+                selectedFolderId = null;
+                localStorage.removeItem('selectedFolderId');
+            }
+            showFoldersView();
+        }
+
+        function selectFolderForStudy(folderId) {
+            const folder = folders.find(f => f.id === folderId);
+            if (!folder || folder.hidden) {
+                alert('Эта колода скрыта и не может быть выбрана.');
+                return;
+            }
+            selectedFolderId = folderId;
+            localStorage.setItem('selectedFolderId', folderId);
+            showFoldersView();
+        }
+
         // ==================== UI ====================
         async function showFoldersView(initialQuery = '') {
             document.getElementById('current-folder-name').textContent = 'Мои колоды';
@@ -1506,32 +1588,93 @@
             const searchInput = document.getElementById('search-input');
             const resultsDiv = document.getElementById('search-results');
 
+            // ==================== ИСПРАВЛЕННАЯ ФУНКЦИЯ РЕНДЕРИНГА СПИСКА ====================
             function renderResults(query) {
                 if (!query || query.length < 1) {
-                    const sortedFolders = [...folders].sort((a, b) => (a.hidden ? 1 : 0) - (b.hidden ? 1 : 0));
-                    resultsDiv.innerHTML = `
-                        <div class="grid grid-cols-1 gap-3">
-                            ${sortedFolders.map(f => `
-                                <div id="folder-${f.id}" onclick="selectFolder('${f.id}')" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 cursor-pointer touch-target ${f.hidden ? 'opacity-50' : ''}">
-                                    <div class="flex justify-between items-center">
-                                        <div>
-                                            <div class="font-semibold text-lg">${escapeHtml(f.name)}</div>
-                                            <div class="text-sm text-slate-500 dark:text-slate-400">${f.cards.length} слов${f.hidden ? ' · <span class="text-amber-500">скрыто</span>' : ''}</div>
-                                        </div>
-                                        <div class="flex items-center gap-x-3">
-                                            ${f.system ? '' : `
-                                            <button onclick="toggleFolderHidden('${f.id}', event)" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xl touch-target flex items-center justify-center" aria-label="${f.hidden ? 'Показать колоду' : 'Скрыть колоду'}">
-                                                <i class="fa-solid ${f.hidden ? 'fa-eye-slash' : 'fa-eye'}"></i>
-                                            </button>
-                                            `}
-                                            <i class="fa-solid ${f.system ? 'fa-trophy text-amber-500' : 'fa-folder text-teal-500'} text-3xl"></i>
-                                        </div>
-                                    </div>
-                                </div>
-                            `).join('')}
+                    // Фильтруем: системная папка «Изученные слова» показывается только если в ней есть слова.
+                    // Всегда помещаем её в самый низ списка.
+                    let displayFolders = folders.filter(f => !f.system || (f.cards && f.cards.length > 0));
+                    const sortedFolders = displayFolders.sort((a, b) => {
+                        // Системная папка всегда последней
+                        if (a.system && !b.system) return 1;
+                        if (!a.system && b.system) return -1;
+                        // Затем по hidden (скрытые внизу среди обычных)
+                        return (a.hidden ? 1 : 0) - (b.hidden ? 1 : 0);
+                    });
+
+                    let html = `
+                        <div class="flex gap-2 mb-3 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
+                            <button onclick="setStudyMode('all')" 
+                                    class="flex-1 py-2 rounded-xl text-sm font-medium transition ${studyMode === 'all' ? 'bg-teal-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-400'}">
+                                🌐 Все колоды
+                            </button>
+                            <button onclick="setStudyMode('selected')" 
+                                    class="flex-1 py-2 rounded-xl text-sm font-medium transition ${studyMode === 'selected' ? 'bg-teal-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-400'}">
+                                📂 Выбранная
+                            </button>
                         </div>
                     `;
-                    // Долгое нажатие (исправленная версия)
+
+                    if (studyMode === 'selected') {
+                        const selected = folders.find(f => f.id === selectedFolderId);
+                        html += `<div class="text-sm mb-2 text-slate-600 dark:text-slate-400">Выбрана: ${selected ? escapeHtml(selected.name) : 'не выбрана'}</div>`;
+                    }
+
+                    html += `<div class="grid grid-cols-1 gap-3">`;
+
+                    for (const f of sortedFolders) {
+                        const isSelected = (studyMode === 'selected' && selectedFolderId === f.id);
+                        const isHidden = !!f.hidden;
+                        const isSystem = !!f.system;
+
+                        let cardHtml = `
+                            <div onclick="selectFolder('${f.id}')" 
+                                 class="relative bg-white dark:bg-slate-800 border rounded-3xl p-4 cursor-pointer touch-target 
+                                 ${isSelected ? 'border-teal-500 ring-2 ring-teal-300' : 'border-slate-200 dark:border-slate-700'} 
+                                 ${isHidden ? 'opacity-50' : ''}">
+                        `;
+
+                        if (studyMode === 'selected' && !isSystem) {
+                            const disabled = isHidden ? 'disabled' : '';
+                            const checked = isSelected ? 'checked' : '';
+                            cardHtml += `
+                                <div class="flex items-start">
+                                    <input type="radio" name="study-folder" value="${f.id}" ${checked} ${disabled}
+                                           onchange="event.stopImmediatePropagation(); selectFolderForStudy('${f.id}')" 
+                                           class="mt-1 w-5 h-5 accent-teal-600 flex-shrink-0">
+                                    <div class="ml-3 flex-1">
+                            `;
+                        }
+
+                        cardHtml += `
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <div class="font-semibold text-lg">${escapeHtml(f.name)}</div>
+                                    <div class="text-sm text-slate-500 dark:text-slate-400">${f.cards ? f.cards.length : 0} слов${isHidden ? ' · <span class="text-amber-500">скрыто</span>' : ''}</div>
+                                </div>
+                                <div class="flex items-center gap-x-3">
+                                    ${!isSystem ? `
+                                    <button onclick="event.stopImmediatePropagation(); toggleFolderHidden('${f.id}', event)" 
+                                            class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xl touch-target">
+                                        <i class="fa-solid ${isHidden ? 'fa-eye-slash' : 'fa-eye'}"></i>
+                                    </button>` : ''}
+                                    <i class="fa-solid ${isSystem ? 'fa-trophy text-amber-500' : 'fa-folder text-teal-500'} text-3xl"></i>
+                                </div>
+                            </div>
+                        `;
+
+                        if (studyMode === 'selected' && !isSystem) {
+                            cardHtml += `</div></div>`;
+                        }
+
+                        cardHtml += `</div>`;
+                        html += cardHtml;
+                    }
+
+                    html += `</div>`;
+                    resultsDiv.innerHTML = html;
+
+                    // Долгое нажатие для контекстного меню
                     document.querySelectorAll('[id^="folder-"]').forEach(el => {
                         const folderId = el.id.replace('folder-', '');
                         let pressTimer = null;
@@ -1557,7 +1700,6 @@
                             clearTimeout(pressTimer);
                             el.style.transform = 'scale(1)';
                         });
-                        // Десктоп: правое нажатие
                         el.addEventListener('contextmenu', (e) => {
                             e.preventDefault();
                             showFolderContextMenu(folderId);
@@ -1735,87 +1877,71 @@
 
         // ==================== ИЗУЧЕНИЕ ====================
         async function startStudy() {
-            const folder = getCurrentFolder();
+            let cards = [];
+            let sourceName = '';
 
-            if (folder.hidden) {
-                document.getElementById('current-folder-name').textContent = folder.name;
-                const container = document.getElementById('main-content');
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="text-center py-6">
-                            <i class="fa-solid fa-eye-slash text-5xl text-slate-300 dark:text-slate-600 mb-4"></i>
-                            <h2 class="text-xl font-semibold mb-2">Эта колода скрыта</h2>
-                            <p class="text-slate-600 dark:text-slate-400 mb-4">Включите её, чтобы начать обучение</p>
-                            <button onclick="unhideAndStudy('${folder.id}')" class="px-6 py-3 bg-teal-600 text-white rounded-2xl font-medium text-base touch-target">
-                                <i class="fa-solid fa-eye"></i> Показать и учить
-                            </button>
-                        </div>
-                    </div>
-                `;
-                const undo = document.getElementById('undo-review-btn');
-                if (undo) undo.remove();
-                return;
+            if (studyMode === 'selected') {
+                if (!selectedFolderId) {
+                    alert('Сначала выберите колоду для изучения.');
+                    return;
+                }
+                const folder = folders.find(f => f.id === selectedFolderId);
+                if (!folder || folder.hidden) {
+                    alert('Выбранная колода скрыта или не существует. Выберите другую.');
+                    selectedFolderId = null;
+                    localStorage.removeItem('selectedFolderId');
+                    showFoldersView();
+                    return;
+                }
+                cards = folder.cards || [];
+                sourceName = folder.name;
+            } else {
+                // Режим «Все колоды»
+                const visibleFolders = folders.filter(f => !f.hidden && !f.system);
+                cards = visibleFolders.flatMap(f => f.cards || []);
+                cards = cards.map(c => {
+                    const parent = visibleFolders.find(f => f.cards && f.cards.some(card => card.id === c.id));
+                    return { ...c, folderName: parent ? parent.name : '' };
+                });
+                sourceName = 'Все колоды';
             }
 
-            document.getElementById('current-folder-name').textContent = 'Изучение';
-            dueCards = getDueCards(folder);
+            dueCards = getDueCardsFromArray(cards);
 
             if (dailyLimitEnabled && dueCards.length > dailyLimitCount) {
                 dueCards = dueCards.slice(0, dailyLimitCount);
             }
+
             initialDueCount = dueCards.length;
 
-            let undoBtn = document.getElementById('undo-review-btn');
-            if (undoBtn) undoBtn.remove();
-
-            undoBtn = document.createElement('button');
-            undoBtn.id = 'undo-review-btn';
-            undoBtn.className = 'touch-target';
-            undoBtn.setAttribute('aria-label', 'Отменить последнюю оценку');
-            undoBtn.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
-            undoBtn.onclick = undoLastReview;
-            document.getElementById('main-content').appendChild(undoBtn);
-            undoBtn.style.display = 'none';
-
-            if (dueCards.length > 0) {
-                currentCardIndex = 0;
-                lastReviewedCard = null;
-                sessionStableCandidates = [];
-                showCurrentCard();
-            } else if (folder.cards.length > 0) {
-                const timeInfo = getTimeUntilNextReview(folder.cards);
-                const container = document.getElementById('main-content');
-                let html = `
-                    <div class="empty-state">
-                        <div class="text-center py-6">
-                            <i class="fa-solid fa-clock text-5xl text-slate-300 dark:text-slate-600 mb-4"></i>
-                            <h2 class="text-xl font-semibold mb-2">Пока нет слов для повторения</h2>
-                `;
-                if (timeInfo) {
-                    const t = timeInfo.date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-                    html += `<p class="text-slate-600 dark:text-slate-400">Следующее повторение ${timeInfo.text} (около ${t})</p>`;
-                }
-                html += `
-                            <button onclick="showFoldersView()" class="mt-4 px-6 py-3 bg-teal-600 text-white rounded-2xl font-medium text-base touch-target">Вернуться к колодам</button>
-                        </div>
-                    </div>
-                `;
-                container.innerHTML = html;
-                const undo = document.getElementById('undo-review-btn');
-                if (undo) undo.remove();
-            } else {
-                const container = document.getElementById('main-content');
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="text-center py-6">
-                            <p class="text-lg mb-3">В этой колоде пока нет слов</p>
-                            <button onclick="showAddCardModal()" class="px-5 py-3 bg-teal-600 text-white rounded-2xl text-base touch-target">Добавить первое слово</button>
-                        </div>
-                    </div>
-                `;
-                const undo = document.getElementById('undo-review-btn');
-                if (undo) undo.remove();
+            if (dueCards.length === 0) {
+                showEmptyStudyState(sourceName);
+                return;
             }
+
+            currentCardIndex = 0;
+            lastReviewedCard = null;
+            sessionStableCandidates = [];
+            showCurrentCard();
+        }
+
+        function showEmptyStudyState(sourceName) {
+            const container = document.getElementById('main-content');
+            if (!container) return;
+
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
+                    <i class="fa-solid fa-check-circle text-7xl text-teal-500 mb-6"></i>
+                    <div class="text-2xl font-semibold mb-3">Всё повторено!</div>
+                    <div class="text-slate-500 dark:text-slate-400 max-w-xs mb-8">
+                        В «${escapeHtml(sourceName)}» нет карточек для повторения на сегодня.
+                    </div>
+                    <button onclick="showFoldersView()" 
+                            class="px-8 py-3.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white rounded-2xl font-medium text-base touch-target transition">
+                        Вернуться к колодам
+                    </button>
+                </div>
+            `;
         }
 
         function showCurrentCard() {
@@ -1893,6 +2019,15 @@
                    </div>`;
             }
 
+            let folderLabelHTML = '';
+            if (studyMode === 'all' && card.folderName) {
+                folderLabelHTML = `
+                    <div class="absolute bottom-3 left-3 px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-xs text-slate-500 dark:text-slate-400 rounded-full">
+                        ${escapeHtml(card.folderName)}
+                    </div>
+                `;
+            }
+
             const container = document.getElementById('main-content');
             container.innerHTML = `
                 <div class="study-container">
@@ -1913,6 +2048,7 @@
                             <button onclick="event.stopImmediatePropagation(); speakCurrentWord()" class="speak-btn">
                                 <i class="fa-solid fa-volume-up"></i>
                             </button>
+                            ${folderLabelHTML}
                         </div>
                     </div>
                     <div class="rating-buttons">
@@ -2092,6 +2228,15 @@
         function hideCardViewModal() {
             document.getElementById('cardViewModal').classList.add('hidden');
             document.getElementById('cardViewModal').classList.remove('flex');
+            // Освобождаем ObjectURL при закрытии модалки
+            if (viewingCardId) {
+                const folder = getCurrentFolder();
+                const card = folder.cards.find(c => c.id === viewingCardId);
+                if (card && card._imageObjectUrl) {
+                    URL.revokeObjectURL(card._imageObjectUrl);
+                    card._imageObjectUrl = null;
+                }
+            }
         }
 
         function editFromViewModal() {
@@ -2355,12 +2500,38 @@
             const folder = getCurrentFolder();
             const card = folder.cards.find(c => c.id === editingCardId);
             if (!card) return;
+
             card.english = document.getElementById('edit-english').value.trim();
             card.russian = document.getElementById('edit-russian').value.trim();
-            const stabilityVal = document.getElementById('edit-stability').value;
-            const difficultyVal = document.getElementById('edit-difficulty').value;
-            card.stability = stabilityVal !== '' ? parseFloat(stabilityVal) : undefined;
-            card.difficulty = difficultyVal !== '' ? clampDifficulty(parseFloat(difficultyVal)) : undefined;
+
+            // Читаем значения из полей
+            const stabilityVal = document.getElementById('edit-stability').value.trim();
+            const difficultyVal = document.getElementById('edit-difficulty').value.trim();
+
+            // Преобразуем в числа, если не пусто
+            const newStability = stabilityVal !== '' ? parseFloat(stabilityVal) : undefined;
+            const newDifficulty = difficultyVal !== '' ? parseFloat(difficultyVal) : undefined;
+
+            // Проверяем, были ли изменения
+            const stabilityChanged = newStability !== card.stability;
+            const difficultyChanged = newDifficulty !== card.difficulty;
+
+            // Если пользователь ввёл нечисловые значения – предупредим
+            if ((stabilityVal !== '' && isNaN(newStability)) || (difficultyVal !== '' && isNaN(newDifficulty))) {
+                alert('Введены некорректные числовые значения. Будет использовано безопасное значение.');
+            }
+
+            // Если меняются FSRS-параметры – запрашиваем подтверждение
+            if (stabilityChanged || difficultyChanged) {
+                if (!confirm('Вы меняете параметры FSRS (Стабильность/Сложность). Это может изменить расписание повторений. Продолжить?')) {
+                    return;
+                }
+            }
+
+            // Применяем значения (с защитой)
+            card.stability = newStability !== undefined ? safeStability(newStability) : undefined;
+            card.difficulty = newDifficulty !== undefined ? safeDifficulty(newDifficulty) : undefined;
+
             card.state = document.getElementById('edit-state').value;
             const dateVal = document.getElementById('edit-next-date').value;
             if (dateVal) card.nextReviewDate = new Date(dateVal).toISOString();
@@ -2482,95 +2653,102 @@
             showFolderCards(currentFolderId);
         }
 
-        // --- Улучшенный парсер импорта (три уровня) ---
+        // --- Улучшенный парсер импорта ---
         function parseImportText(text) {
             if (!text || typeof text !== 'string') return [];
-            const trimmedText = text.trim();
-            if (!trimmedText) return [];
-
+            const trimmed = text.trim();
+            if (!trimmed) return [];
             const cards = [];
+            const lines = trimmed.split(/\r?\n/);
+            let current = null;
+            let lastHeader = null;
 
-            // Уровень 1: Front: / Back:
-            if (/^Front:/im.test(trimmedText) && /^Back:/im.test(trimmedText)) {
-                const blocks = trimmedText.split(/\n\s*\n/);
+            for (let i = 0; i < lines.length; i++) {
+                const raw = lines[i];
+                const t = raw.trim();
+
+                if (!t && !current) continue;
+
+                const frontMatch = t.match(/^Front:\s*(.*)/i);
+                const backMatch = t.match(/^Back:\s*(.*)/i);
+
+                if (frontMatch) {
+                    if (current && current.front && current.back) {
+                        cards.push({ english: current.front.trim(), russian: current.back.trim() });
+                    }
+                    current = { front: frontMatch[1] || '', back: '' };
+                    lastHeader = 'front';
+                } else if (backMatch) {
+                    if (!current) current = { front: '', back: '' };
+                    current.back = backMatch[1] || '';
+                    lastHeader = 'back';
+                } else if (current && lastHeader) {
+                    if (lastHeader === 'front') {
+                        current.front += (current.front ? '\n' : '') + t;
+                    } else if (lastHeader === 'back') {
+                        current.back += (current.back ? '\n' : '') + t;
+                    }
+                }
+            }
+
+            if (current && current.front && current.back) {
+                cards.push({ english: current.front.trim(), russian: current.back.trim() });
+            }
+
+            // Fallbacks (обратная совместимость)
+            if (cards.length === 0) {
+                const sepPattern = /[—–\-:→=>]\s*/;
+                for (const line of lines) {
+                    const t = line.trim();
+                    if (!t) continue;
+                    const sepMatch = t.match(sepPattern);
+                    if (sepMatch) {
+                        const idx = t.indexOf(sepMatch[0]);
+                        const eng = t.slice(0, idx).trim();
+                        const rus = t.slice(idx + sepMatch[0].length).trim();
+                        if (eng && rus) cards.push({ english: eng, russian: rus });
+                    } else if (t.includes('\t')) {
+                        const parts = t.split('\t');
+                        if (parts.length >= 2 && parts[0].trim() && parts[1].trim()) {
+                            cards.push({ english: parts[0].trim(), russian: parts[1].trim() });
+                        }
+                    }
+                }
+            }
+
+            if (cards.length === 0) {
+                const blocks = trimmed.split(/\n\s*\n/);
                 for (const block of blocks) {
-                    const lines = block.trim().split('\n');
-                    let front = '', back = '', current = '';
-                    for (const line of lines) {
-                        const t = line.trim();
-                        if (t.startsWith('Front:')) { current = 'front'; front = t.replace(/^Front:\s*/, ''); }
-                        else if (t.startsWith('Back:')) { current = 'back'; back = t.replace(/^Back:\s*/, ''); }
-                        else if (current === 'front') front += '\n' + t;
-                        else if (current === 'back') back += '\n' + t;
-                    }
-                    if (front.trim() && back.trim()) cards.push({ english: front.trim(), russian: back.trim() });
+                    const bl = block.split('\n').map(l => l.trim()).filter(Boolean);
+                    if (bl.length >= 2) cards.push({ english: bl[0], russian: bl[1] });
                 }
-                if (cards.length) return cards;
             }
 
-            // Уровень 2: классические разделители
-            const lines = trimmedText.split(/\r?\n/);
-            for (const line of lines) {
-                const t = line.trim();
-                if (!t) continue;
-                const seps = [' — ', ' – ', ' - ', ' : ', ' → ', ' => '];
-                let found = false;
-                for (const sep of seps) {
-                    const idx = t.indexOf(sep);
-                    if (idx !== -1) {
-                        const eng = t.substring(0, idx).trim();
-                        const rus = t.substring(idx + sep.length).trim();
-                        if (eng && rus) { cards.push({ english: eng, russian: rus }); found = true; break; }
-                    }
-                }
-                if (!found && t.includes('\t')) {
-                    const parts = t.split('\t');
-                    if (parts.length >= 2 && parts[0].trim() && parts[1].trim())
-                        cards.push({ english: parts[0].trim(), russian: parts[1].trim() });
-                }
-            }
-            if (cards.length) return cards;
-
-            // Уровень 3: пустые строки
-            let i = 0;
-            while (i < lines.length) {
-                while (i < lines.length && lines[i].trim() === '') i++;
-                if (i >= lines.length) break;
-                const eng = lines[i].trim(); i++;
-                while (i < lines.length && lines[i].trim() === '') i++;
-                if (i >= lines.length) break;
-                const rus = lines[i].trim(); i++;
-                if (eng && rus) cards.push({ english: eng, russian: rus });
-            }
             return cards;
         }
 
-        // --- Функции для безопасного импорта ---
-        function regenerateImportedIds(importedFolders) {
-            importedFolders.forEach(folder => {
-                folder.id = 'folder_' + Date.now() + Math.random();
-                if (folder.cards) {
-                    folder.cards.forEach(card => {
-                        card.id = 'card_' + Date.now() + Math.random();
-                    });
+        // --- Дедупликация ---
+        function findDuplicates(newCards, existingCards) {
+            const existingSet = new Set(
+                existingCards.map(c => 
+                    `${(c.english || '').toLowerCase().trim()}|${(c.russian || '').toLowerCase().trim()}`
+                )
+            );
+            const duplicates = [];
+            const unique = [];
+            for (const card of newCards) {
+                const key = `${(card.english || '').toLowerCase().trim()}|${(card.russian || '').toLowerCase().trim()}`;
+                if (existingSet.has(key)) {
+                    duplicates.push(card);
+                } else {
+                    unique.push(card);
+                    existingSet.add(key);
                 }
-            });
-        }
-
-        function deduplicateSystemFolders() {
-            const systemFolders = folders.filter(f => f.system);
-            if (systemFolders.length <= 1) return;
-
-            const main = systemFolders[0];
-            for (let i = 1; i < systemFolders.length; i++) {
-                const extra = systemFolders[i];
-                if (extra.cards?.length) {
-                    main.cards.push(...extra.cards);
-                }
-                folders = folders.filter(f => f.id !== extra.id);
             }
+            return { duplicates, unique };
         }
 
+        // --- Обновлённый импорт с дедупликацией ---
         async function importWords() {
             const text = document.getElementById('import-text').value.trim();
             const folderId = document.getElementById('import-folder-select').value;
@@ -2591,10 +2769,20 @@
                 ...makeFreshCardProgress()
             }));
 
-            folder.cards.push(...cardsToAdd);
+            const { duplicates, unique } = findDuplicates(cardsToAdd, folder.cards);
+
+            if (duplicates.length > 0) {
+                alert(`Найдено ${duplicates.length} дублирующихся карточек. Они пропущены.`);
+            }
+            if (unique.length === 0) {
+                alert('Нет новых уникальных карточек для добавления.');
+                return;
+            }
+
+            folder.cards.push(...unique);
             await saveData();
             document.getElementById('import-text').value = '';
-            alert(`Импортировано ${cardsToAdd.length} слов`);
+            alert(`Импортировано ${unique.length} слов (${duplicates.length} пропущено дублей)`);
             showFolderCards(folderId);
             await checkAchievements();
         }
@@ -2686,6 +2874,23 @@ Back: Красивый</pre>
 
                 // Удаляем дублирующиеся системные папки
                 deduplicateSystemFolders();
+
+                // Дедупликация внутри каждой колоды (при добавлении)
+                if (!shouldReplace) {
+                    folders.forEach(folder => {
+                        if (!folder.cards) return;
+                        const map = new Map();
+                        const unique = [];
+                        folder.cards.forEach(card => {
+                            const key = `${(card.english||'').toLowerCase().trim()}|${(card.russian||'').toLowerCase().trim()}`;
+                            if (!map.has(key)) {
+                                map.set(key, true);
+                                unique.push(card);
+                            }
+                        });
+                        folder.cards = unique;
+                    });
+                }
 
                 validateAndRepairData();
                 await migrateOldBase64Images();
