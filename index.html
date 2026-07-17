@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+                <<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -771,35 +771,6 @@
         }
 
         // --- Вспомогательные функции рендера (для сокращения кода) ---
-        function createFolderListItem(folder) {
-            const div = document.createElement('div');
-            div.id = `folder-${folder.id}`;
-            div.className = 'folder-item bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 mb-3 cursor-pointer touch-target active:scale-[0.985] transition-transform';
-            div.innerHTML = `
-                <div class="flex justify-between items-start">
-                    <div class="flex-1 min-w-0">
-                        <div class="font-semibold text-lg">${escapeHtml(folder.name)}</div>
-                        <div class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">${folder.cards.length} слов</div>
-                    </div>
-                    <div class="text-teal-600 dark:text-teal-400"><i class="fa-solid fa-chevron-right"></i></div>
-                </div>
-            `;
-            div.onclick = () => selectFolder(folder.id);
-            // Долгое нажатие для контекстного меню
-            let pressTimer;
-            div.addEventListener('touchstart', () => {
-                div.style.transform = 'scale(0.985)';
-                pressTimer = setTimeout(() => {
-                    if (navigator.vibrate) navigator.vibrate(20);
-                    showFolderContextMenu(folder.id);
-                }, 520);
-            }, { passive: true });
-            div.addEventListener('touchend', () => { clearTimeout(pressTimer); div.style.transform = 'scale(1)'; });
-            div.addEventListener('touchcancel', () => { clearTimeout(pressTimer); div.style.transform = 'scale(1)'; });
-            div.addEventListener('contextmenu', (e) => { e.preventDefault(); showFolderContextMenu(folder.id); });
-            return div;
-        }
-
         function createCardListRow(card) {
             const div = document.createElement('div');
             div.className = 'list-item last:border-b-0 touch-target';
@@ -964,22 +935,7 @@
             card.masteredSuggestionDismissed = false;
         }
 
-        // ==================== ПОЛУЧЕНИЕ DUE-КАРТОЧЕК (ИСПРАВЛЕНА) ====================
-        function getDueCards(folder) {
-            const now = new Date();
-            return folder.cards
-                .filter(card => {
-                    if (!card.nextReviewDate) return true;
-                    const d = new Date(card.nextReviewDate);
-                    return isNaN(d.getTime()) || d <= now;
-                })
-                .sort((a, b) => {
-                    const da = new Date(a.nextReviewDate || 0);
-                    const db = new Date(b.nextReviewDate || 0);
-                    return da - db;
-                });
-        }
-
+        // ==================== ПОЛУЧЕНИЕ DUE-КАРТОЧЕК ====================
         function getDueCardsFromArray(cards) {
             const now = new Date();
             return cards
@@ -1536,31 +1492,6 @@
             return results;
         }
 
-        // ==================== РЕЖИМЫ ОБУЧЕНИЯ ====================
-        let studyMode = localStorage.getItem('studyMode') || 'all'; // 'all' | 'selected'
-        let selectedFolderId = localStorage.getItem('selectedFolderId') || null;
-
-        function setStudyMode(mode) {
-            studyMode = mode;
-            localStorage.setItem('studyMode', mode);
-            if (mode === 'all') {
-                selectedFolderId = null;
-                localStorage.removeItem('selectedFolderId');
-            }
-            showFoldersView();
-        }
-
-        function selectFolderForStudy(folderId) {
-            const folder = folders.find(f => f.id === folderId);
-            if (!folder || folder.hidden) {
-                alert('Эта колода скрыта и не может быть выбрана.');
-                return;
-            }
-            selectedFolderId = folderId;
-            localStorage.setItem('selectedFolderId', folderId);
-            showFoldersView();
-        }
-
         // ==================== UI ====================
         async function showFoldersView(initialQuery = '') {
             document.getElementById('current-folder-name').textContent = 'Мои колоды';
@@ -1588,87 +1519,54 @@
             const searchInput = document.getElementById('search-input');
             const resultsDiv = document.getElementById('search-results');
 
-            // ==================== ИСПРАВЛЕННАЯ ФУНКЦИЯ РЕНДЕРИНГА СПИСКА ====================
             function renderResults(query) {
                 if (!query || query.length < 1) {
-                    // Фильтруем: системная папка «Изученные слова» показывается только если в ней есть слова.
-                    // Всегда помещаем её в самый низ списка.
                     let displayFolders = folders.filter(f => !f.system || (f.cards && f.cards.length > 0));
                     const sortedFolders = displayFolders.sort((a, b) => {
-                        // Системная папка всегда последней
                         if (a.system && !b.system) return 1;
                         if (!a.system && b.system) return -1;
-                        // Затем по hidden (скрытые внизу среди обычных)
                         return (a.hidden ? 1 : 0) - (b.hidden ? 1 : 0);
                     });
 
-                    let html = `
-                        <div class="flex gap-2 mb-3 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
-                            <button onclick="setStudyMode('all')" 
-                                    class="flex-1 py-2 rounded-xl text-sm font-medium transition ${studyMode === 'all' ? 'bg-teal-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-400'}">
-                                🌐 Все колоды
-                            </button>
-                            <button onclick="setStudyMode('selected')" 
-                                    class="flex-1 py-2 rounded-xl text-sm font-medium transition ${studyMode === 'selected' ? 'bg-teal-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-400'}">
-                                📂 Выбранная
-                            </button>
-                        </div>
-                    `;
-
-                    if (studyMode === 'selected') {
-                        const selected = folders.find(f => f.id === selectedFolderId);
-                        html += `<div class="text-sm mb-2 text-slate-600 dark:text-slate-400">Выбрана: ${selected ? escapeHtml(selected.name) : 'не выбрана'}</div>`;
-                    }
-
-                    html += `<div class="grid grid-cols-1 gap-3">`;
+                    let html = `<div class="grid grid-cols-1 gap-3">`;
 
                     for (const f of sortedFolders) {
-                        const isSelected = (studyMode === 'selected' && selectedFolderId === f.id);
                         const isHidden = !!f.hidden;
                         const isSystem = !!f.system;
 
-                        let cardHtml = `
-                            <div onclick="selectFolder('${f.id}')" 
-                                 class="relative bg-white dark:bg-slate-800 border rounded-3xl p-4 cursor-pointer touch-target 
-                                 ${isSelected ? 'border-teal-500 ring-2 ring-teal-300' : 'border-slate-200 dark:border-slate-700'} 
-                                 ${isHidden ? 'opacity-50' : ''}">
-                        `;
-
-                        if (studyMode === 'selected' && !isSystem) {
-                            const disabled = isHidden ? 'disabled' : '';
-                            const checked = isSelected ? 'checked' : '';
-                            cardHtml += `
-                                <div class="flex items-start">
-                                    <input type="radio" name="study-folder" value="${f.id}" ${checked} ${disabled}
-                                           onchange="event.stopImmediatePropagation(); selectFolderForStudy('${f.id}')" 
-                                           class="mt-1 w-5 h-5 accent-teal-600 flex-shrink-0">
-                                    <div class="ml-3 flex-1">
+                        if (isSystem) {
+                            html += `
+                                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 opacity-75">
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <div class="font-semibold text-lg">${escapeHtml(f.name)}</div>
+                                            <div class="text-sm text-slate-500 dark:text-slate-400">${f.cards.length} слов</div>
+                                        </div>
+                                        <i class="fa-solid fa-trophy text-amber-500 text-3xl"></i>
+                                    </div>
+                                </div>
                             `;
+                            continue;
                         }
 
-                        cardHtml += `
-                            <div class="flex justify-between items-center">
-                                <div>
-                                    <div class="font-semibold text-lg">${escapeHtml(f.name)}</div>
-                                    <div class="text-sm text-slate-500 dark:text-slate-400">${f.cards ? f.cards.length : 0} слов${isHidden ? ' · <span class="text-amber-500">скрыто</span>' : ''}</div>
-                                </div>
-                                <div class="flex items-center gap-x-3">
-                                    ${!isSystem ? `
-                                    <button onclick="event.stopImmediatePropagation(); toggleFolderHidden('${f.id}', event)" 
-                                            class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xl touch-target">
-                                        <i class="fa-solid ${isHidden ? 'fa-eye-slash' : 'fa-eye'}"></i>
-                                    </button>` : ''}
-                                    <i class="fa-solid ${isSystem ? 'fa-trophy text-amber-500' : 'fa-folder text-teal-500'} text-3xl"></i>
+                        html += `
+                            <div id="folder-${f.id}" class="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 touch-target ${isHidden ? 'opacity-50' : ''}">
+                                <div class="flex justify-between items-center">
+                                    <!-- Клик по названию → открыть колоду -->
+                                    <div class="flex-1 cursor-pointer" onclick="selectFolder('${f.id}')">
+                                        <div class="font-semibold text-lg">${escapeHtml(f.name)}</div>
+                                        <div class="text-sm text-slate-500 dark:text-slate-400">${f.cards.length} слов</div>
+                                    </div>
+
+                                    <!-- Иконка обучения (▶️) -->
+                                    <button onclick="event.stopImmediatePropagation(); startStudyWithFolder('${f.id}')"
+                                            class="text-teal-600 hover:text-teal-700 text-3xl touch-target ml-3"
+                                            title="Начать обучение по этой колоде">
+                                        <i class="fa-solid fa-play-circle"></i>
+                                    </button>
                                 </div>
                             </div>
                         `;
-
-                        if (studyMode === 'selected' && !isSystem) {
-                            cardHtml += `</div></div>`;
-                        }
-
-                        cardHtml += `</div>`;
-                        html += cardHtml;
                     }
 
                     html += `</div>`;
@@ -1707,10 +1605,12 @@
                     });
                     return;
                 }
+
+                // Поиск (без изменений)
                 const results = searchWords(query);
-                resultsDiv.innerHTML = results.length === 0 
+                resultsDiv.innerHTML = results.length === 0
                     ? `<div class="text-center py-6 text-slate-500 dark:text-slate-400">Ничего не найдено</div>`
-                    : `<div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl overflow-hidden">` + 
+                    : `<div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl overflow-hidden">` +
                       results.map(card => `
                         <div onclick="editCardFromSearch('${card.folderId}', '${card.id}')" class="flex justify-between items-center px-4 py-3 border-b border-slate-100 dark:border-slate-800 last:border-b-0 cursor-pointer touch-target">
                             <div><span class="font-medium">${escapeHtml(card.english)}</span> <span class="mx-2 text-slate-400">—</span> <span class="text-slate-600 dark:text-slate-300">${escapeHtml(card.russian)}</span></div>
@@ -1865,7 +1765,6 @@
                 </div>
             `;
 
-            // Рендер карточек через helper (для сокращения кода)
             if (folder.cards.length > 0) {
                 const listContainer = document.getElementById('card-list');
                 folder.cards.forEach(card => {
@@ -1876,36 +1775,14 @@
         }
 
         // ==================== ИЗУЧЕНИЕ ====================
-        async function startStudy() {
-            let cards = [];
-            let sourceName = '';
-
-            if (studyMode === 'selected') {
-                if (!selectedFolderId) {
-                    alert('Сначала выберите колоду для изучения.');
-                    return;
-                }
-                const folder = folders.find(f => f.id === selectedFolderId);
-                if (!folder || folder.hidden) {
-                    alert('Выбранная колода скрыта или не существует. Выберите другую.');
-                    selectedFolderId = null;
-                    localStorage.removeItem('selectedFolderId');
-                    showFoldersView();
-                    return;
-                }
-                cards = folder.cards || [];
-                sourceName = folder.name;
-            } else {
-                // Режим «Все колоды»
-                const visibleFolders = folders.filter(f => !f.hidden && !f.system);
-                cards = visibleFolders.flatMap(f => f.cards || []);
-                cards = cards.map(c => {
-                    const parent = visibleFolders.find(f => f.cards && f.cards.some(card => card.id === c.id));
-                    return { ...c, folderName: parent ? parent.name : '' };
-                });
-                sourceName = 'Все колоды';
+        function startStudyWithFolder(folderId) {
+            const folder = folders.find(f => f.id === folderId);
+            if (!folder || folder.hidden) {
+                alert('Эта колода скрыта.');
+                return;
             }
 
+            const cards = folder.cards || [];
             dueCards = getDueCardsFromArray(cards);
 
             if (dailyLimitEnabled && dueCards.length > dailyLimitCount) {
@@ -1915,7 +1792,38 @@
             initialDueCount = dueCards.length;
 
             if (dueCards.length === 0) {
-                showEmptyStudyState(sourceName);
+                showEmptyStudyState(folder.name);
+                return;
+            }
+
+            currentCardIndex = 0;
+            lastReviewedCard = null;
+            sessionStableCandidates = [];
+            document.getElementById('current-folder-name').textContent = 'Обучение';
+            showCurrentCard();
+        }
+
+        async function startStudy() {
+            document.getElementById('current-folder-name').textContent = 'Обучение';
+
+            const visibleFolders = folders.filter(f => !f.hidden && !f.system);
+            const cards = visibleFolders.flatMap(f => f.cards || []);
+
+            const cardsWithFolder = cards.map(c => {
+                const parent = visibleFolders.find(f => f.cards && f.cards.some(card => card.id === c.id));
+                return { ...c, folderName: parent ? parent.name : '' };
+            });
+
+            dueCards = getDueCardsFromArray(cardsWithFolder);
+
+            if (dailyLimitEnabled && dueCards.length > dailyLimitCount) {
+                dueCards = dueCards.slice(0, dailyLimitCount);
+            }
+
+            initialDueCount = dueCards.length;
+
+            if (dueCards.length === 0) {
+                showEmptyStudyState('Все колоды');
                 return;
             }
 
@@ -1972,7 +1880,6 @@
                     undoBtn.style.display = 'none';
                 }
 
-                // Показываем предложение по стабильным словам в конце сессии
                 if (sessionStableCandidates.length > 0) {
                     setTimeout(() => {
                         showEndOfSessionStableReview();
@@ -2003,7 +1910,6 @@
                 `;
             }
 
-            // Изображение рендерим placeholder'ом, реальный src подставим после отрисовки
             let imageHtml = '';
             if (card.imageId || (card.image && card.image.startsWith('data:image'))) {
                 imageHtml = `
@@ -2020,7 +1926,7 @@
             }
 
             let folderLabelHTML = '';
-            if (studyMode === 'all' && card.folderName) {
+            if (card.folderName) {
                 folderLabelHTML = `
                     <div class="absolute bottom-3 left-3 px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-xs text-slate-500 dark:text-slate-400 rounded-full">
                         ${escapeHtml(card.folderName)}
@@ -2062,10 +1968,8 @@
 
             fitStudyCardContent();
 
-            // Подгружаем изображение после отрисовки
             const imgContainer = document.getElementById('study-image-container');
             if (imgContainer) {
-                // long-press меню для фото
                 let pressTimer = null;
                 const startPress = (e) => {
                     pressTimer = setTimeout(() => {
@@ -2212,14 +2116,13 @@
             document.getElementById('cardViewModal').classList.remove('hidden');
             document.getElementById('cardViewModal').classList.add('flex');
 
-            // Подгружаем изображение после открытия модалки
             if (card.imageId || (card.image && card.image.startsWith('data:image'))) {
                 (async () => {
                     const src = await getCardImageSrc(card);
                     const imgEl = document.getElementById('view-card-image');
                     if (imgEl && src) {
                         imgEl.src = src;
-                        card._imageObjectUrl = src; // сохраняем для revokeObjectURL
+                        card._imageObjectUrl = src;
                     }
                 })();
             }
@@ -2228,7 +2131,6 @@
         function hideCardViewModal() {
             document.getElementById('cardViewModal').classList.add('hidden');
             document.getElementById('cardViewModal').classList.remove('flex');
-            // Освобождаем ObjectURL при закрытии модалки
             if (viewingCardId) {
                 const folder = getCurrentFolder();
                 const card = folder.cards.find(c => c.id === viewingCardId);
@@ -2272,17 +2174,14 @@
             recordFlip();
         }
 
-        // Автоподбор размера текста (и, если этого мало, картинки) под карточку.
-        // Работает для любой длины слова/фразы и любого сочетания с фото —
-        // без обрезания текста и без прокрутки экрана.
         function fitStudyCardContent() {
             const cardEl = document.querySelector('.study-card');
             if (!cardEl) return;
 
             const isSmallScreen = window.innerWidth <= 480;
-            const baseEnglish = isSmallScreen ? 2 : 2.5;   // rem
-            const baseRussian = isSmallScreen ? 1.6 : 2;   // rem
-            const baseImgHeight = 140;                     // px
+            const baseEnglish = isSmallScreen ? 2 : 2.5;
+            const baseRussian = isSmallScreen ? 1.6 : 2;
+            const baseImgHeight = 140;
             const minEnglish = 1.15, minRussian = 1.05, minImgHeight = 60;
 
             let scale = 1;
@@ -2294,15 +2193,13 @@
                 if (cardEl.scrollHeight <= cardEl.clientHeight + 1) break;
 
                 scale -= 0.06;
-                if (scale <= 0.35) break; // не уменьшаем до нечитаемости
+                if (scale <= 0.35) break;
 
                 const eng = Math.max(minEnglish, baseEnglish * scale);
                 const rus = Math.max(minRussian, baseRussian * scale);
                 cardEl.style.setProperty('--word-font-english', eng + 'rem');
                 cardEl.style.setProperty('--word-font-russian', rus + 'rem');
 
-                // Сначала ужимаем только текст; если пары шагов не хватило — начинаем
-                // соразмерно уменьшать и картинку, чтобы всё вместе поместилось.
                 if (step >= 3) {
                     const imgH = Math.max(minImgHeight, baseImgHeight * scale);
                     cardEl.style.setProperty('--img-max-height', imgH + 'px');
@@ -2310,7 +2207,6 @@
             }
         }
 
-        // Пересчитываем подгонку при повороте экрана/изменении размера окна
         window.addEventListener('resize', debounce(() => {
             if (document.querySelector('.study-card')) fitStudyCardContent();
         }, 200));
@@ -2323,53 +2219,51 @@
             isRatingCard = true;
             try {
 
-            // Сохраняем полный снимок сессии для отмены
-            lastReviewedCard = {
-                card: JSON.parse(JSON.stringify(card)),
-                index: currentCardIndex,
-                statsSnapshot: JSON.parse(JSON.stringify(stats)),
-                dueCardsSnapshot: JSON.parse(JSON.stringify(dueCards)),
-                initialDueCountSnapshot: initialDueCount
-            };
+                lastReviewedCard = {
+                    card: JSON.parse(JSON.stringify(card)),
+                    index: currentCardIndex,
+                    statsSnapshot: JSON.parse(JSON.stringify(stats)),
+                    dueCardsSnapshot: JSON.parse(JSON.stringify(dueCards)),
+                    initialDueCountSnapshot: initialDueCount
+                };
 
-            if (navigator.vibrate) navigator.vibrate(10);
+                if (navigator.vibrate) navigator.vibrate(10);
 
-            await updateCardAfterReview(card, grade);
-            await recordStudyActivity();
-            await recordReviewOutcome(grade);
+                await updateCardAfterReview(card, grade);
+                await recordStudyActivity();
+                await recordReviewOutcome(grade);
 
-            // Собираем стабильные слова для предложения в конце сессии
-            if (grade >= 3 && shouldSuggestMastered(card)) {
-                if (!sessionStableCandidates.some(c => c.id === card.id)) {
-                    sessionStableCandidates.push(card);
+                if (grade >= 3 && shouldSuggestMastered(card)) {
+                    if (!sessionStableCandidates.some(c => c.id === card.id)) {
+                        sessionStableCandidates.push(card);
+                    }
                 }
-            }
 
-            const cardEl = document.querySelector('.study-card');
-            const flashClasses = {
-                1: 'ring-4 ring-red-400',
-                2: 'ring-4 ring-orange-400',
-                3: 'ring-4 ring-emerald-400',
-                4: 'ring-4 ring-teal-400'
-            };
-            if (cardEl) {
-                cardEl.classList.add(...flashClasses[grade].split(' '));
-                cardEl.style.transition = 'opacity 0.18s ease, transform 0.18s ease';
-                await new Promise(r => setTimeout(r, 140));
-                cardEl.style.opacity = '0';
-                cardEl.style.transform = 'translateY(-10px)';
-                await new Promise(r => setTimeout(r, 140));
-            }
+                const cardEl = document.querySelector('.study-card');
+                const flashClasses = {
+                    1: 'ring-4 ring-red-400',
+                    2: 'ring-4 ring-orange-400',
+                    3: 'ring-4 ring-emerald-400',
+                    4: 'ring-4 ring-teal-400'
+                };
+                if (cardEl) {
+                    cardEl.classList.add(...flashClasses[grade].split(' '));
+                    cardEl.style.transition = 'opacity 0.18s ease, transform 0.18s ease';
+                    await new Promise(r => setTimeout(r, 140));
+                    cardEl.style.opacity = '0';
+                    cardEl.style.transform = 'translateY(-10px)';
+                    await new Promise(r => setTimeout(r, 140));
+                }
 
-            currentCardIndex++;
-            showCurrentCard();
-            await checkAchievements();
+                currentCardIndex++;
+                showCurrentCard();
+                await checkAchievements();
 
-            const undoBtn = document.getElementById('undo-review-btn');
-            if (undoBtn) {
-                undoBtn.classList.add('visible');
-                undoBtn.style.display = 'flex';
-            }
+                const undoBtn = document.getElementById('undo-review-btn');
+                if (undoBtn) {
+                    undoBtn.classList.add('visible');
+                    undoBtn.style.display = 'flex';
+                }
             } finally {
                 isRatingCard = false;
             }
@@ -2377,7 +2271,6 @@
 
         async function undoLastReview() {
             if (!lastReviewedCard) return;
-
             if (navigator.vibrate) navigator.vibrate(10);
 
             const { card: savedCard, index, statsSnapshot, dueCardsSnapshot, initialDueCountSnapshot } = lastReviewedCard;
@@ -2397,13 +2290,11 @@
                 Object.assign(realCard, savedCard);
             }
 
-            // Восстанавливаем статистику
             if (statsSnapshot) {
                 Object.assign(stats, statsSnapshot);
                 await saveStats();
             }
 
-            // Восстанавливаем список dueCards и счётчик
             if (dueCardsSnapshot) {
                 dueCards = dueCardsSnapshot;
             }
@@ -2424,8 +2315,6 @@
             await saveData();
         }
 
-        // Троеточие на карточке в режиме изучения — открывает ту же модалку
-        // редактирования, что и в списке колоды (правка, сброс прогресса, архив, удаление — всё в одном месте).
         function editCurrentStudyCard(event) {
             if (event) event.stopImmediatePropagation();
             const card = dueCards[currentCardIndex];
@@ -2433,9 +2322,6 @@
             editCard(card.id, 'study');
         }
 
-        // Возврат после закрытия модалки редактирования — туда, откуда её открыли.
-        // Если карточку редактировали во время изучения, обновляем её прямо в текущей сессии,
-        // а если она пропала из текущей колоды (удалена/перенесена в архив) — убираем из очереди.
         function closeEditModalAndReturn() {
             hideEditModal();
             if (editContext === 'study') {
@@ -2504,31 +2390,25 @@
             card.english = document.getElementById('edit-english').value.trim();
             card.russian = document.getElementById('edit-russian').value.trim();
 
-            // Читаем значения из полей
             const stabilityVal = document.getElementById('edit-stability').value.trim();
             const difficultyVal = document.getElementById('edit-difficulty').value.trim();
 
-            // Преобразуем в числа, если не пусто
             const newStability = stabilityVal !== '' ? parseFloat(stabilityVal) : undefined;
             const newDifficulty = difficultyVal !== '' ? parseFloat(difficultyVal) : undefined;
 
-            // Проверяем, были ли изменения
             const stabilityChanged = newStability !== card.stability;
             const difficultyChanged = newDifficulty !== card.difficulty;
 
-            // Если пользователь ввёл нечисловые значения – предупредим
             if ((stabilityVal !== '' && isNaN(newStability)) || (difficultyVal !== '' && isNaN(newDifficulty))) {
                 alert('Введены некорректные числовые значения. Будет использовано безопасное значение.');
             }
 
-            // Если меняются FSRS-параметры – запрашиваем подтверждение
             if (stabilityChanged || difficultyChanged) {
                 if (!confirm('Вы меняете параметры FSRS (Стабильность/Сложность). Это может изменить расписание повторений. Продолжить?')) {
                     return;
                 }
             }
 
-            // Применяем значения (с защитой)
             card.stability = newStability !== undefined ? safeStability(newStability) : undefined;
             card.difficulty = newDifficulty !== undefined ? safeDifficulty(newDifficulty) : undefined;
 
@@ -2624,7 +2504,6 @@
 
             const folder = getCurrentFolder();
 
-            // Основная карточка
             const card = {
                 id: 'card_' + Date.now() + Math.random(),
                 english: english,
@@ -2635,7 +2514,6 @@
             };
             folder.cards.push(card);
 
-            // Реверсивная карточка
             if (isReversible) {
                 const reverseCard = {
                     id: 'card_' + Date.now() + Math.random(),
@@ -2653,7 +2531,6 @@
             showFolderCards(currentFolderId);
         }
 
-        // --- Улучшенный парсер импорта ---
         function parseImportText(text) {
             if (!text || typeof text !== 'string') return [];
             const trimmed = text.trim();
@@ -2695,7 +2572,6 @@
                 cards.push({ english: current.front.trim(), russian: current.back.trim() });
             }
 
-            // Fallbacks (обратная совместимость)
             if (cards.length === 0) {
                 const sepPattern = /[—–\-:→=>]\s*/;
                 for (const line of lines) {
@@ -2727,7 +2603,6 @@
             return cards;
         }
 
-        // --- Дедупликация ---
         function findDuplicates(newCards, existingCards) {
             const existingSet = new Set(
                 existingCards.map(c => 
@@ -2748,7 +2623,6 @@
             return { duplicates, unique };
         }
 
-        // --- Обновлённый импорт с дедупликацией ---
         async function importWords() {
             const text = document.getElementById('import-text').value.trim();
             const folderId = document.getElementById('import-folder-select').value;
@@ -2787,7 +2661,6 @@
             await checkAchievements();
         }
 
-        // --- Кнопка "Как импортировать" ---
         function showImportHelpModal() {
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]';
@@ -2845,7 +2718,6 @@ Back: Красивый</pre>
             a.click();
         }
 
-        // ==================== ДЕДУПЛИКАЦИЯ СИСТЕМНЫХ ПАПОК ====================
         function deduplicateSystemFolders() {
             const systemFolders = folders.filter(f => f.system === true);
             if (systemFolders.length <= 1) return;
@@ -2859,7 +2731,6 @@ Back: Красивый</pre>
             }
         }
 
-        // ==================== Защищённый импорт данных (ИСПРАВЛЕН) ====================
         async function importData(jsonString) {
             try {
                 if (!jsonString || typeof jsonString !== 'string') {
@@ -3126,7 +2997,6 @@ Back: Красивый</pre>
                 return;
             }
 
-            // Удаляем связанные изображения
             if (folder && folder.cards) {
                 for (const card of folder.cards) {
                     if (card._imageObjectUrl) URL.revokeObjectURL(card._imageObjectUrl);
@@ -3153,7 +3023,6 @@ Back: Красивый</pre>
             const langCode = lang === 'en' ? 'en-US' : 'ru-RU';
             const cacheKey = `${lang}:${text}`;
 
-            // Проверяем кэш в памяти
             if (audioCache.has(cacheKey)) {
                 const cachedUrl = audioCache.get(cacheKey);
                 const audio = new Audio(cachedUrl);
@@ -3178,10 +3047,7 @@ Back: Красивый</pre>
                 if (response.ok) {
                     const blob = await response.blob();
                     const audioUrl = URL.createObjectURL(blob);
-
-                    // Сохраняем в кэш памяти
                     audioCache.set(cacheKey, audioUrl);
-
                     const audio = new Audio(audioUrl);
                     audio.play();
                     audio.onended = () => URL.revokeObjectURL(audioUrl);
@@ -3261,23 +3127,78 @@ Back: Красивый</pre>
             });
         }
 
-        // ==================== PWA (манифест, Service Worker отключён) ====================
-        function generateIcon(size, text = 'V') {
+        // ==================== PWA ====================
+        function generateIcon(size) {
             const canvas = document.createElement('canvas');
-            canvas.width = size; canvas.height = size;
-            const ctx = canvas.getContext('2d');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d', { alpha: true });
+
             const grad = ctx.createLinearGradient(0, 0, size, size);
-            grad.addColorStop(0, '#0d9488'); grad.addColorStop(1, '#0f766e');
-            ctx.fillStyle = grad; ctx.fillRect(0, 0, size, size);
-            ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.font = `bold ${size * 0.6}px system-ui, sans-serif`;
-            ctx.fillText(text, size/2, size/2 + size*0.05);
+            grad.addColorStop(0, '#0f766e');
+            grad.addColorStop(0.5, '#134e4b');
+            grad.addColorStop(1, '#0c3d3a');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, size, size);
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx.lineWidth = size * 0.03;
+            ctx.strokeRect(size * 0.08, size * 0.08, size * 0.84, size * 0.84);
+
+            const bookX = size * 0.22;
+            const bookY = size * 0.28;
+            const bookW = size * 0.56;
+            const bookH = size * 0.48;
+
+            ctx.fillStyle = '#f1e7d2';
+            ctx.beginPath();
+            ctx.moveTo(bookX, bookY);
+            ctx.lineTo(bookX + bookW / 2 - size * 0.02, bookY);
+            ctx.lineTo(bookX + bookW / 2 - size * 0.02, bookY + bookH);
+            ctx.lineTo(bookX, bookY + bookH);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(bookX + bookW / 2 + size * 0.02, bookY);
+            ctx.lineTo(bookX + bookW, bookY);
+            ctx.lineTo(bookX + bookW, bookY + bookH);
+            ctx.lineTo(bookX + bookW / 2 + size * 0.02, bookY + bookH);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = '#0f766e';
+            ctx.lineWidth = size * 0.018;
+            for (let i = 0; i < 4; i++) {
+                const y = bookY + size * (0.12 + i * 0.09);
+                ctx.beginPath();
+                ctx.moveTo(bookX + size * 0.06, y);
+                ctx.lineTo(bookX + bookW / 2 - size * 0.08, y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(bookX + bookW / 2 + size * 0.08, y);
+                ctx.lineTo(bookX + bookW - size * 0.06, y);
+                ctx.stroke();
+            }
+
+            ctx.strokeStyle = 'rgba(13, 148, 136, 0.55)';
+            ctx.lineWidth = size * 0.012;
+            ctx.beginPath();
+            ctx.moveTo(bookX + bookW / 2 - size * 0.01, bookY + size * 0.25);
+            ctx.lineTo(bookX + bookW / 2 + size * 0.01, bookY + size * 0.35);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(bookX + bookW / 2 - size * 0.01, bookY + size * 0.45);
+            ctx.lineTo(bookX + bookW / 2 + size * 0.01, bookY + size * 0.55);
+            ctx.stroke();
+
             return canvas.toDataURL('image/png');
         }
 
         function createManifest() {
             const icon192 = generateIcon(192);
             const icon512 = generateIcon(512);
+
             const manifest = {
                 name: 'Vocabulary',
                 short_name: 'Vocab',
@@ -3291,8 +3212,10 @@ Back: Красивый</pre>
                     { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any' },
                     { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any' },
                     { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+                    { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
                 ]
             };
+
             const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
             return URL.createObjectURL(blob);
         }
@@ -3300,7 +3223,15 @@ Back: Красивый</pre>
         (function installPWA() {
             const manifestUrl = createManifest();
             const link = document.createElement('link');
-            link.rel = 'manifest'; link.href = manifestUrl;
+            link.rel = 'manifest';
+            link.href = manifestUrl;
+            document.head.appendChild(link);
+        })();
+
+        (function () {
+            const link = document.createElement('link');
+            link.rel = 'apple-touch-icon';
+            link.href = generateIcon(180);
             document.head.appendChild(link);
         })();
 
@@ -3323,9 +3254,7 @@ Back: Красивый</pre>
             await checkAchievements();
         }
 
-        // ==================== Защита от потери данных при закрытии вкладки ====================
         function flushPendingChanges() {
-            // Fallback-сохранение при beforeunload/pagehide (без await)
             try {
                 if (typeof saveData === 'function') {
                     saveData();
@@ -3335,7 +3264,6 @@ Back: Красивый</pre>
             }
         }
 
-        // Основной механизм сохранения при скрытии страницы (с await)
         document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState === 'hidden') {
                 try {
