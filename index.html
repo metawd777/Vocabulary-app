@@ -1,4 +1,4 @@
-                <<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -1550,19 +1550,38 @@
                         }
 
                         html += `
-                            <div id="folder-${f.id}" class="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 touch-target ${isHidden ? 'opacity-50' : ''}">
-                                <div class="flex justify-between items-center">
-                                    <!-- Клик по названию → открыть колоду -->
-                                    <div class="flex-1 cursor-pointer" onclick="selectFolder('${f.id}')">
-                                        <div class="font-semibold text-lg">${escapeHtml(f.name)}</div>
-                                        <div class="text-sm text-slate-500 dark:text-slate-400">${f.cards.length} слов</div>
+                            <div id="folder-${f.id}" 
+                                 class="group relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 active:scale-[0.985] transition-all duration-100 touch-target ${isHidden ? 'opacity-50' : ''}">
+                                
+                                <div class="flex items-center justify-between gap-x-3">
+                                    
+                                    <!-- Левая часть -->
+                                    <div class="flex min-w-0 flex-1 items-center gap-x-3 cursor-pointer" 
+                                         onclick="selectFolder('${f.id}')">
+                                        
+                                        <div class="min-w-0 flex-1">
+                                            <div class="font-semibold text-[17px] leading-snug text-slate-900 dark:text-white truncate">
+                                                ${escapeHtml(f.name)}
+                                            </div>
+                                            <div class="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                                ${f.cards.length} слов
+                                            </div>
+                                        </div>
+
+                                        <!-- Глазок -->
+                                        <button onclick="event.stopImmediatePropagation(); toggleFolderHidden('${f.id}', event)"
+                                                class="text-slate-400 hover:text-slate-600 active:text-slate-700 text-[22px] flex-shrink-0 touch-target px-1 -mr-1"
+                                                title="Скрыть / показать колоду">
+                                            <i class="fa-solid ${isHidden ? 'fa-eye-slash' : 'fa-eye'}"></i>
+                                        </button>
                                     </div>
 
-                                    <!-- Иконка обучения (▶️) -->
+                                    <!-- Кнопка "Учить" -->
                                     <button onclick="event.stopImmediatePropagation(); startStudyWithFolder('${f.id}')"
-                                            class="text-teal-600 hover:text-teal-700 text-3xl touch-target ml-3"
+                                            class="flex items-center justify-center gap-x-2 rounded-2xl bg-teal-600 active:bg-teal-700 px-4 py-[9px] text-[15px] font-semibold text-white shadow-sm active:shadow-none transition-all touch-target flex-shrink-0"
                                             title="Начать обучение по этой колоде">
-                                        <i class="fa-solid fa-play-circle"></i>
+                                        <i class="fa-solid fa-graduation-cap text-[17px]"></i>
+                                        <span>Учить</span>
                                     </button>
                                 </div>
                             </div>
@@ -1577,7 +1596,7 @@
                         const folderId = el.id.replace('folder-', '');
                         let pressTimer = null;
 
-                        el.addEventListener('touchstart', (e) => {
+                        el.addEventListener('touchstart', () => {
                             el.style.transition = 'transform 0.08s ease';
                             el.style.transform = 'scale(0.985)';
                             pressTimer = setTimeout(() => {
@@ -1638,9 +1657,6 @@
             await checkAchievements();
         }
 
-        // Скрыть/показать колоду. Скрытая колода: не пропадает и не удаляется,
-        // просто уходит вниз списка, помечается значком и недоступна для изучения,
-        // пока её не включат обратно. Прогресс и статистика по её словам не затрагиваются.
         async function toggleFolderHidden(folderId, event) {
             if (event) event.stopPropagation();
             const folder = folders.find(f => f.id === folderId);
