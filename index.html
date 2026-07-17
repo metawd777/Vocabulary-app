@@ -2845,10 +2845,32 @@ Back: Красивый</pre>
             a.click();
         }
 
-        // ==================== Защищённый импорт данных ====================
+        // ==================== ДЕДУПЛИКАЦИЯ СИСТЕМНЫХ ПАПОК ====================
+        function deduplicateSystemFolders() {
+            const systemFolders = folders.filter(f => f.system === true);
+            if (systemFolders.length <= 1) return;
+            const main = systemFolders[0];
+            for (let i = 1; i < systemFolders.length; i++) {
+                const extra = systemFolders[i];
+                if (extra.cards && extra.cards.length) {
+                    main.cards.push(...extra.cards);
+                }
+                folders = folders.filter(f => f.id !== extra.id);
+            }
+        }
+
+        // ==================== Защищённый импорт данных (ИСПРАВЛЕН) ====================
         async function importData(jsonString) {
             try {
+                if (!jsonString || typeof jsonString !== 'string') {
+                    throw new Error('Файл пустой или не является текстовым');
+                }
+
                 const imported = JSON.parse(jsonString);
+
+                if (imported === null || imported === undefined) {
+                    throw new Error('Файл пустой или повреждён');
+                }
 
                 if (!Array.isArray(imported)) {
                     throw new Error('Файл должен содержать массив колод');
@@ -2867,34 +2889,16 @@ Back: Красивый</pre>
                 if (shouldReplace) {
                     folders = imported;
                 } else {
-                    // Перегенерируем ID, чтобы избежать конфликтов
                     regenerateImportedIds(imported);
                     folders = folders.concat(imported);
                 }
 
-                // Удаляем дублирующиеся системные папки
                 deduplicateSystemFolders();
-
-                // Дедупликация внутри каждой колоды (при добавлении)
-                if (!shouldReplace) {
-                    folders.forEach(folder => {
-                        if (!folder.cards) return;
-                        const map = new Map();
-                        const unique = [];
-                        folder.cards.forEach(card => {
-                            const key = `${(card.english||'').toLowerCase().trim()}|${(card.russian||'').toLowerCase().trim()}`;
-                            if (!map.has(key)) {
-                                map.set(key, true);
-                                unique.push(card);
-                            }
-                        });
-                        folder.cards = unique;
-                    });
-                }
 
                 validateAndRepairData();
                 await migrateOldBase64Images();
                 await saveData();
+
                 alert('Данные успешно импортированы');
                 showFoldersView();
                 await checkAchievements();
