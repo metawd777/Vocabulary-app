@@ -62,11 +62,12 @@
 
         .study-card {
             background: white; border-radius: 24px; border: 1px solid #e2e8f0;
-            padding: 20px 16px; min-height: 200px; width: 100%;
+            padding: 20px 16px; min-height: 200px; width: 100%; height: 100%;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             position: relative;
             max-width: 100%;
             overflow: hidden;
+            box-sizing: border-box;
         }
         .dark .study-card { background:#1e293b; border-color:#334155; }
 
@@ -81,20 +82,22 @@
             line-height: 1.3;
             width: 100%;
             white-space: pre-line;
+            /* Базовые размеры ниже — это стартовая точка. JS (fitStudyCardContent)
+               подбирает финальное значение через --word-font-english/--word-font-russian,
+               уменьшая текст (и картинку), если контент не помещается в карточку. */
         }
-        .study-card .word-english { font-size: 2.5rem; }
-        .study-card .word-russian { font-size: 2rem; }
+        .study-card .word-english { font-size: var(--word-font-english, 2.5rem); }
+        .study-card .word-russian { font-size: var(--word-font-russian, 2rem); }
 
         @media (max-width: 480px) {
-            .study-card .word-english { font-size: 2rem; }
-            .study-card .word-russian { font-size: 1.6rem; }
+            .study-card { --word-font-english: 2rem; --word-font-russian: 1.6rem; }
         }
 
         .study-container { display: flex; flex-direction: column; height: 100%; padding-top: 4px; }
-        .study-card-wrapper { flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; }
+        .study-card-wrapper { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
-        .study-card .image-area { width: 100%; max-width: 200px; margin-bottom: 12px; position: relative; }
-        .study-card .image-area img { width: 100%; max-height: 140px; object-fit: contain; border-radius: 16px; }
+        .study-card .image-area { width: 100%; max-width: 200px; margin-bottom: 12px; position: relative; flex-shrink: 0; }
+        .study-card .image-area img { width: 100%; max-height: var(--img-max-height, 140px); object-fit: contain; border-radius: 16px; }
         .study-card .image-placeholder {
             width: 100%; max-width: 200px; height: 70px; border: 2px dashed #cbd5e1; border-radius: 16px;
             display: flex; align-items: center; justify-content: center; font-size: 14px; color: #94a3b8; gap: 8px; cursor: pointer; margin-bottom: 12px;
@@ -1287,19 +1290,6 @@
             return true;
         }
 
-        async function markCurrentCardAsMastered() {
-            if (currentCardIndex >= dueCards.length) return;
-            const card = dueCards[currentCardIndex];
-            if (!card) return;
-            await updateCardAfterReview(card, 4);
-            await moveCardToMastered(card);
-            dueCards.splice(currentCardIndex, 1);
-            initialDueCount--;
-            lastReviewedCard = null;
-            const undoBtn = document.getElementById('undo-review-btn');
-            if (undoBtn) undoBtn.classList.remove('visible');
-            showCurrentCard();
-        }
 
         // ==================== Показ стабильных слов в конце сессии ====================
         function showEndOfSessionStableReview() {
@@ -1869,6 +1859,8 @@
                 </div>
             `;
 
+            fitStudyCardContent();
+
             // Подгружаем изображение после отрисовки
             const imgContainer = document.getElementById('study-image-container');
             if (imgContainer) {
@@ -1893,6 +1885,8 @@
                         const imgEl = document.getElementById('study-card-image');
                         if (imgEl) {
                             if (src) {
+                                imgEl.addEventListener('load', fitStudyCardContent, { once: true });
+                                imgEl.addEventListener('error', fitStudyCardContent, { once: true });
                                 imgEl.src = src;
                                 card._imageObjectUrl = src;
                             } else {
@@ -1903,6 +1897,7 @@
                                         <span>Изображение недоступно</span>
                                     </div>
                                 `;
+                                fitStudyCardContent();
                             }
                         }
                     })();
@@ -2063,12 +2058,60 @@
                 void cardEl.offsetWidth;
                 cardEl.classList.add('flip-pulse');
             }
+            fitStudyCardContent();
             recordFlip();
         }
 
+        // Автоподбор размера текста (и, если этого мало, картинки) под карточку.
+        // Работает для любой длины слова/фразы и любого сочетания с фото —
+        // без обрезания текста и без прокрутки экрана.
+        function fitStudyCardContent() {
+            const cardEl = document.querySelector('.study-card');
+            if (!cardEl) return;
+
+            const isSmallScreen = window.innerWidth <= 480;
+            const baseEnglish = isSmallScreen ? 2 : 2.5;   // rem
+            const baseRussian = isSmallScreen ? 1.6 : 2;   // rem
+            const baseImgHeight = 140;                     // px
+            const minEnglish = 1.15, minRussian = 1.05, minImgHeight = 60;
+
+            let scale = 1;
+            cardEl.style.setProperty('--word-font-english', baseEnglish + 'rem');
+            cardEl.style.setProperty('--word-font-russian', baseRussian + 'rem');
+            cardEl.style.setProperty('--img-max-height', baseImgHeight + 'px');
+
+            for (let step = 0; step < 18; step++) {
+                if (cardEl.scrollHeight <= cardEl.clientHeight + 1) break;
+
+                scale -= 0.06;
+                if (scale <= 0.35) break; // не уменьшаем до нечитаемости
+
+                const eng = Math.max(minEnglish, baseEnglish * scale);
+                const rus = Math.max(minRussian, baseRussian * scale);
+                cardEl.style.setProperty('--word-font-english', eng + 'rem');
+                cardEl.style.setProperty('--word-font-russian', rus + 'rem');
+
+                // Сначала ужимаем только текст; если пары шагов не хватило — начинаем
+                // соразмерно уменьшать и картинку, чтобы всё вместе поместилось.
+                if (step >= 3) {
+                    const imgH = Math.max(minImgHeight, baseImgHeight * scale);
+                    cardEl.style.setProperty('--img-max-height', imgH + 'px');
+                }
+            }
+        }
+
+        // Пересчитываем подгонку при повороте экрана/изменении размера окна
+        window.addEventListener('resize', debounce(() => {
+            if (document.querySelector('.study-card')) fitStudyCardContent();
+        }, 200));
+
+        let isRatingCard = false;
         async function rateCard(grade) {
+            if (isRatingCard) return;
             const card = dueCards[currentCardIndex];
             if (!card) return;
+            isRatingCard = true;
+            try {
 
             // Сохраняем полный снимок сессии для отмены
             lastReviewedCard = {
@@ -2116,6 +2159,9 @@
             if (undoBtn) {
                 undoBtn.classList.add('visible');
                 undoBtn.style.display = 'flex';
+            }
+            } finally {
+                isRatingCard = false;
             }
         }
 
