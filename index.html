@@ -2,13 +2,24 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Vocabulary">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0f172a">
     <title>Vocabulary • Финальная версия</title>
+    <script>
+        // Применяем тёмный класс синхронно, ДО первой отрисовки и до Tailwind —
+        // иначе при холодном запуске в тёмном режиме на миг мелькает светлая тема.
+        (function() {
+            try {
+                var mode = localStorage.getItem('themeMode') || 'auto';
+                var isDark = mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                if (isDark) document.documentElement.classList.add('dark');
+            } catch (e) {}
+        })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = { darkMode: 'class' };
@@ -24,6 +35,7 @@
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
+        /* Базовые стили – сохранены из исходной финальной версии */
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
         input, textarea { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
         html, body { margin:0; padding:0; height:100%; overflow:hidden; font-family: system-ui, -apple-system, sans-serif; }
@@ -83,6 +95,8 @@
             line-height: 1.3;
             width: 100%;
             white-space: pre-line;
+            -webkit-user-select: text;
+            user-select: text;
         }
         .study-card .word-english { font-size: var(--word-font-english, 2.5rem); }
         .study-card .word-russian { font-size: var(--word-font-russian, 2rem); }
@@ -146,24 +160,26 @@
 
         #undo-review-btn {
             position: absolute;
-            bottom: 16px;
-            right: 16px;
-            width: 48px;
-            height: 48px;
+            bottom: 12px;
+            right: 12px;
+            padding: 8px 14px 8px 12px;
+            min-height: 44px;
             border-radius: 9999px;
             background: white;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
+            gap: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
             color: #0d9488;
             z-index: 70;
             transition: opacity 0.2s, transform 0.2s;
             opacity: 0;
             pointer-events: none;
-            transform: scale(0.8);
+            transform: scale(0.85);
             border: 1px solid #e2e8f0;
+            cursor: pointer;
         }
         .dark #undo-review-btn {
             background: #1e293b;
@@ -189,40 +205,16 @@
         @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
         @keyframes slideUp { from { transform:translateY(20px) scale(0.98); opacity:0; } to { transform:translateY(0) scale(1); opacity:1; } }
 
-        /* Защита от обрезки длинных названий колод */
-        [id^="folder-"] .font-semibold {
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            word-break: break-word;
-        }
-
-        .list-item {
-            display: flex;
-            align-items: center;
-            padding: 12px 16px;
-            border-bottom: 1px solid #e2e8f0;
-            cursor: pointer;
-        }
-        .dark .list-item { border-color: #334155; }
-
-        /* Utility-классы для сокращения повторяющихся Tailwind-комбинаций.
-           Каждый класс ниже — это ровно та же комбинация, что раньше писалась
-           длинной строкой прямо в HTML/шаблонах. Поведение не меняется. */
+        /* Utility-классы */
         .stat-card { background:white; border:1px solid #e2e8f0; border-radius:24px; padding:16px; text-align:center; }
         .dark .stat-card { background:#1e293b; border-color:#334155; }
-
         .stat-label { font-size:0.75rem; color:#64748b; margin-top:4px; }
         .dark .stat-label { color:#94a3b8; }
-
         .panel { background:white; border:1px solid #e2e8f0; border-radius:24px; padding:16px; margin-bottom:12px; }
         .dark .panel { background:#1e293b; border-color:#334155; }
-
         .menu-item { width:100%; text-align:left; padding:12px 16px; border-radius:16px; display:flex; align-items:center; gap:12px; font-size:1rem; min-height:48px; min-width:48px; background:transparent; border:none; cursor:pointer; }
         .menu-item:hover { background:#f1f5f9; }
         .dark .menu-item:hover { background:#334155; }
-
         .field-input { width:100%; padding:8px 12px; border-radius:12px; border:1px solid #cbd5e1; }
         .dark .field-input { border-color:#475569; background:#1e293b; }
 
@@ -247,6 +239,26 @@
         .btn-primary-half { flex:1; background:#0d9488; color:white; border:none; }
 
         .empty-state { display:flex; align-items:center; justify-content:center; padding:0 16px; overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch; }
+
+        /* Стили для выделения карточек (мультивыбор) */
+        .list-item.selected {
+            background-color: #f0fdf4;
+            border-color: #0d9488;
+        }
+        .dark .list-item.selected {
+            background-color: #134e4b;
+            border-color: #14b8a6;
+        }
+        .selection-checkbox {
+            flex-shrink: 0;
+        }
+        #selection-action-bar {
+            backdrop-filter: blur(8px);
+            background: rgba(255,255,255,0.9) !important;
+        }
+        .dark #selection-action-bar {
+            background: rgba(15,23,42,0.95) !important;
+        }
     </style>
 </head>
 <body class="text-slate-900 dark:text-slate-100">
@@ -291,7 +303,7 @@
         </div>
     </div>
 
-    <!-- Модалка просмотра карточки -->
+    <!-- Модалки (оставлены из предыдущей версии) -->
     <div id="cardViewModal" onclick="hideCardViewModal()" class="modal-overlay hidden flex">
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
             <div id="card-view-content" class="text-center"></div>
@@ -307,7 +319,14 @@
         </div>
     </div>
 
-    <!-- Модалка редактирования -->
+    <div id="customModal" class="modal-overlay hidden flex" style="z-index:300;">
+        <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[400px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
+            <div id="modalTitle" class="text-xl font-semibold mb-2 text-center"></div>
+            <div id="modalMessage" class="text-slate-600 dark:text-slate-300 mb-6 text-center text-base"></div>
+            <div id="modalButtons" class="flex flex-col gap-2"></div>
+        </div>
+    </div>
+
     <div id="editModal" onclick="hideEditModal()" class="modal-overlay hidden flex">
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[440px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
             <div class="font-semibold text-xl mb-4">Редактировать карточку</div>
@@ -352,7 +371,6 @@
         </div>
     </div>
 
-    <!-- Модалка добавления (с чекбоксом реверсивной карточки) -->
     <div id="addCardModal" onclick="hideAddCardModal()" class="modal-overlay hidden flex">
         <div onclick="event.stopImmediatePropagation()" class="modal-panel-sm">
             <div class="font-semibold text-xl mb-4">Добавить слово</div>
@@ -377,7 +395,6 @@
         </div>
     </div>
 
-    <!-- Модалка достижения -->
     <div id="achievementModal" class="modal-overlay hidden flex">
         <div class="bg-white dark:bg-slate-800 w-full sm:w-[380px] rounded-t-3xl sm:rounded-3xl p-6 text-center">
             <div id="achievement-icon" class="w-20 h-20 mx-auto rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-4xl mb-3">🏆</div>
@@ -388,7 +405,6 @@
         </div>
     </div>
 
-    <!-- Модалка выбора колоды для сброса прогресса -->
     <div id="resetFolderSelectionModal" onclick="hideResetFolderSelectionModal()" class="modal-overlay hidden flex">
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
             <div class="font-semibold text-xl mb-4">Выберите колоду для сброса прогресса</div>
@@ -401,6 +417,16 @@
         // --- localforage & storage ---
         localforage.config({ name: 'VocabularyDB', storeName: 'vocab_store' });
 
+        // ==================== КОНСТАНТЫ ====================
+        const CONSTANTS = {
+            MAX_UNDO_STEPS: 5,
+            DEBOUNCE_SAVE_DELAY_MS: 450,
+            TTS_TIMEOUT_MS: 2200,
+            MIN_STUDY_FONT_SCALE: 0.35,
+            LONG_PRESS_DURATION_MS: 520,
+        };
+
+        // ==================== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ====================
         let folders = [];
         let currentFolderId = 'default';
         let currentCardIndex = 0;
@@ -408,17 +434,28 @@
         let initialDueCount = 0;
         let editingCardId = null;
         let viewingCardId = null;
-        let editContext = 'folder'; // 'folder' | 'study' — куда возвращаться после закрытия модалки редактирования
-        let stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0 };
+        let editContext = 'folder';
+        let stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0 };
         let lastReviewedCard = null;
+        let undoStack = [];
         let dailyLimitEnabled = false;
         let dailyLimitCount = 20;
+        let archiveThresholdDays = 30;
         let sessionStableCandidates = [];
 
-        // ==================== MEDIA STORE (Cache API для изображений) ====================
+        // ---- Мультивыбор ----
+        let selectionMode = false;
+        let selectedCardIds = new Set();
+
+        // ---- Аудиокеш (Blob) ----
+        const audioBlobCache = new Map();
+
+        // ---- Защита Escape ----
+        let escapeHandlerAdded = false;
+
+        // ==================== MEDIA STORE ====================
         const MediaStore = {
             cacheName: 'vocabulary-images-v1',
-
             async init() {
                 if (!('caches' in window)) {
                     console.warn('Cache API не поддерживается в этом браузере');
@@ -426,7 +463,6 @@
                 }
                 return true;
             },
-
             async saveImage(cardId, blob) {
                 try {
                     const cache = await caches.open(this.cacheName);
@@ -440,13 +476,11 @@
                     return null;
                 }
             },
-
             async getImage(cardId) {
                 try {
                     const cache = await caches.open(this.cacheName);
                     const response = await cache.match(`img/${cardId}`);
                     if (!response) return null;
-
                     const blob = await response.blob();
                     return URL.createObjectURL(blob);
                 } catch (e) {
@@ -454,7 +488,6 @@
                     return null;
                 }
             },
-
             async deleteImage(cardId) {
                 try {
                     const cache = await caches.open(this.cacheName);
@@ -465,34 +498,50 @@
             }
         };
 
-        // Простой кэш озвучки в памяти на сессию
-        const audioCache = new Map(); // key = `${lang}:${text}`
-
-        // ==================== Защита FSRS от некорректных значений ====================
+        // ==================== БЕЗОПАСНЫЕ ФУНКЦИИ ====================
         function safeNumber(value, defaultValue) {
             return (typeof value === 'number' && Number.isFinite(value)) ? value : defaultValue;
         }
-
         function safeStability(value) {
             const result = safeNumber(value, 0.1);
-            return result > 0 ? result : 0.1;
+            if (result <= 0) return 0.1;
+            // Верхняя граница защищает addDays()/toISOString() от переполнения диапазона Date
+            // (найдено стресс-тестом: значения из ~100 млн уже роняют рендер карточки).
+            // 36500 — это ~100 лет по интервалу при целевой retention 0.9, с огромным запасом
+            // выше любого органического роста или осмысленного ручного ввода.
+            return Math.min(result, 36500);
         }
-
         function safeDifficulty(value) {
             const result = safeNumber(value, 5);
             return Math.min(10, Math.max(1, result));
         }
 
-        // ==================== Вспомогательные функции для изображений ====================
+        // ==================== ЭМОДЗИ ====================
+        function removeEmojis(text) {
+            if (!text) return '';
+            return text.replace(/\p{Extended_Pictographic}/gu, '').trim();
+        }
+
+        // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
         async function compressImageToBlob(file, maxWidth = 600, quality = 0.75) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
+                reader.onerror = () => resolve(null);
                 reader.onload = (e) => {
                     const img = new Image();
+                    img.onerror = () => resolve(null);
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
                         let w = img.width, h = img.height;
-                        if (w > maxWidth) { h = (h * maxWidth) / w; w = maxWidth; }
+                        // Ограничиваем БОЛЬШУЮ сторону, а не только ширину — иначе узкие,
+                        // но очень высокие изображения (портретные скриншоты, панорамы)
+                        // проходили несжатыми в исходном разрешении.
+                        const largerDim = Math.max(w, h);
+                        if (largerDim > maxWidth) {
+                            const ratio = maxWidth / largerDim;
+                            w = Math.max(1, Math.round(w * ratio));
+                            h = Math.max(1, Math.round(h * ratio));
+                        }
                         canvas.width = w; canvas.height = h;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, w, h);
@@ -508,7 +557,6 @@
             if (card.imageId) {
                 const url = await MediaStore.getImage(card.imageId);
                 if (url) return url;
-
                 console.warn('Изображение не найдено в кэше, imageId:', card.imageId);
                 return null;
             }
@@ -520,17 +568,14 @@
 
         async function migrateOldBase64Images() {
             let migrated = 0;
-
             for (const folder of folders) {
                 for (const card of folder.cards) {
                     if (card.image && card.image.startsWith('data:image') && !card.imageId) {
                         try {
                             const res = await fetch(card.image);
                             const blob = await res.blob();
-
                             const imageId = 'img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 11);
                             await MediaStore.saveImage(imageId, blob);
-
                             card.image = null;
                             card.imageId = imageId;
                             migrated++;
@@ -540,40 +585,30 @@
                     }
                 }
             }
-
             if (migrated > 0) {
                 await debouncedSaveData();
                 console.log(`Мигрировано ${migrated} изображений из base64 в Cache API`);
             }
         }
 
-        // ==================== Валидация данных после загрузки (ИСПРАВЛЕНА) ====================
         function validateAndRepairData() {
             let changed = false;
             const now = new Date().toISOString();
-
             folders.forEach(folder => {
                 if (!Array.isArray(folder.cards)) {
                     folder.cards = [];
                     changed = true;
                 }
-
                 folder.cards.forEach(card => {
                     let cardChanged = false;
-
-                    // 1. Если nextReviewDate отсутствует или некорректна — ставим на сегодня
                     if (!card.nextReviewDate || isNaN(new Date(card.nextReviewDate).getTime())) {
                         card.nextReviewDate = now;
                         cardChanged = true;
                     }
-
-                    // 2. Определяем, выглядит ли карточка как "новая"
                     const looksNew = (card.state === 'new') ||
                                      ((card.reps || 0) === 0) ||
                                      (card.stability === undefined || card.stability === null);
-
                     if (looksNew) {
-                        // Принудительно делаем новой и due сегодня (как при текстовом импорте)
                         card.state = 'new';
                         card.reps = 0;
                         card.lapses = card.lapses || 0;
@@ -585,27 +620,22 @@
                         card.masteredSuggestionDismissed = false;
                         cardChanged = true;
                     } else {
-                        // Для изученных — валидируем stability/difficulty
                         card.stability = safeStability(card.stability);
                         card.difficulty = safeDifficulty(card.difficulty);
                     }
-
                     if (!card.state) {
                         card.state = 'new';
                         cardChanged = true;
                     }
-
                     if (cardChanged) changed = true;
                 });
             });
-
             if (changed) {
                 console.log('Данные были автоматически исправлены после загрузки');
                 saveData();
             }
         }
 
-        // Debounce для частых сохранений
         function debounce(func, wait) {
             let timeout;
             return function executedFunction(...args) {
@@ -619,10 +649,7 @@
                 });
             };
         }
-
-        const debouncedSaveData = debounce(() => {
-            saveData();
-        }, 450);
+        const debouncedSaveData = debounce(() => { saveData(); }, 450);
 
         async function loadData() {
             try {
@@ -643,19 +670,13 @@
             migrateData();
         }
 
-        // ==================== MIGRATE (ИСПРАВЛЕНА) ====================
         function migrateData() {
             let changed = false;
-            // Находим существующую ручную системную папку (если она есть)
             let mastered = folders.find(f => f.name === 'Изученные слова' && f.system !== true);
             if (mastered) {
                 mastered.system = true;
                 changed = true;
             }
-            // НЕ создаём пустую папку «Изученные слова» автоматически.
-            // Она появится только при первом перемещении слова (через getMasteredFolder).
-
-            // Удаляем дублирующиеся системные папки (если вдруг их несколько)
             const systemFolders = folders.filter(f => f.system === true);
             if (systemFolders.length > 1) {
                 const main = systemFolders[0];
@@ -668,14 +689,8 @@
                 }
                 changed = true;
             }
-
-            // Остальные миграции полей (lastGrade, masteredSuggestionDismissed)
             folders.forEach(folder => {
                 folder.cards.forEach(card => {
-                    if (card.lastGrade === undefined) {
-                        card.lastGrade = undefined;
-                        changed = true;
-                    }
                     if (card.masteredSuggestionDismissed === undefined) {
                         card.masteredSuggestionDismissed = false;
                         changed = true;
@@ -691,9 +706,9 @@
             } catch (e) {
                 console.error('Ошибка сохранения:', e);
                 if (e.name === 'QuotaExceededError' || (e.code === 22)) {
-                    alert('Хранилище переполнено. Удалите часть изображений или экспортируйте данные, чтобы освободить место.');
+                    await showAlertModal('Ошибка', 'Хранилище переполнено. Удалите часть изображений или экспортируйте данные, чтобы освободить место.');
                 } else {
-                    alert('Не удалось сохранить данные. Возможно, закончилось место на устройстве.');
+                    await showAlertModal('Ошибка', 'Не удалось сохранить данные. Возможно, закончилось место на устройстве.');
                 }
             }
         }
@@ -704,7 +719,7 @@
             } catch (e) {
                 console.error('Ошибка сохранения статистики:', e);
                 if (e.name === 'QuotaExceededError' || (e.code === 22)) {
-                    alert('Хранилище статистики переполнено. Рекомендуется сбросить статистику в настройках.');
+                    await showAlertModal('Ошибка', 'Хранилище статистики переполнено. Рекомендуется сбросить статистику в настройках.');
                 }
             }
         }
@@ -728,26 +743,44 @@
             }
         }
 
-        function loadLimitSettings() {
-            dailyLimitEnabled = localStorage.getItem('dailyLimitEnabled') === 'true';
-            const saved = localStorage.getItem('dailyLimitCount');
-            if (saved) dailyLimitCount = parseInt(saved) || 20;
+        async function loadLimitSettings() {
+            try {
+                const stored = await localforage.getItem('limitSettings');
+                if (stored && typeof stored === 'object') {
+                    dailyLimitEnabled = !!stored.dailyLimitEnabled;
+                    dailyLimitCount = parseInt(stored.dailyLimitCount) || 20;
+                    archiveThresholdDays = stored.archiveThresholdDays !== undefined ? Number(stored.archiveThresholdDays) : 30;
+                    return;
+                }
+            } catch (e) {
+                console.warn('Ошибка загрузки настроек лимита из localForage', e);
+            }
+            const legacyEnabled = localStorage.getItem('dailyLimitEnabled');
+            if (legacyEnabled !== null) {
+                dailyLimitEnabled = legacyEnabled === 'true';
+                const savedCount = localStorage.getItem('dailyLimitCount');
+                if (savedCount) dailyLimitCount = parseInt(savedCount) || 20;
+                await saveLimitSettings();
+                localStorage.removeItem('dailyLimitEnabled');
+                localStorage.removeItem('dailyLimitCount');
+            }
         }
 
-        function saveLimitSettings() {
-            localStorage.setItem('dailyLimitEnabled', dailyLimitEnabled);
-            localStorage.setItem('dailyLimitCount', dailyLimitCount);
+        async function saveLimitSettings() {
+            try {
+                await localforage.setItem('limitSettings', { dailyLimitEnabled, dailyLimitCount, archiveThresholdDays });
+            } catch (e) {
+                console.error('Ошибка сохранения настроек лимита:', e);
+            }
         }
 
         function getCurrentFolder() {
             return folders.find(f => f.id === currentFolderId) || folders[0];
         }
 
-        // ==================== ПОЛУЧЕНИЕ ПАПКИ «ИЗУЧЕННЫЕ СЛОВА» (ленивое создание) ====================
         function getMasteredFolder() {
             let mastered = folders.find(f => f.system === true);
             if (!mastered) {
-                // Создаём только сейчас, когда действительно нужно (при перемещении первого слова)
                 mastered = {
                     id: 'mastered_' + Date.now(),
                     name: 'Изученные слова',
@@ -767,26 +800,92 @@
 
         function escJs(str) {
             if (str === null || str === undefined) return '';
-            return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         }
 
-        // --- Вспомогательные функции рендера (для сокращения кода) ---
-        function createCardListRow(card) {
-            const div = document.createElement('div');
-            div.className = 'list-item last:border-b-0 touch-target';
-            div.innerHTML = `
-                <div class="flex-1">
-                    <span class="font-medium">${escapeHtml(card.english)}</span>
-                    <span class="mx-2 text-slate-400">—</span>
-                    <span class="text-slate-600 dark:text-slate-300">${escapeHtml(card.russian)}</span>
-                </div>
-                <button onclick="event.stopImmediatePropagation(); uploadImageForCard('${card.id}')" class="ml-2 text-xl text-slate-400 hover:text-teal-600 touch-target"><i class="fa-solid fa-camera"></i></button>
-            `;
-            div.onclick = () => viewCard(card.id);
-            return div;
+        // ==================== КАСТОМНЫЕ МОДАЛКИ ====================
+        function showConfirmModal(title, message, { confirmLabel = 'Подтвердить', cancelLabel = 'Отмена', danger = true } = {}) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('customModal');
+                document.getElementById('modalTitle').textContent = title;
+                document.getElementById('modalMessage').textContent = message;
+                const buttonsEl = document.getElementById('modalButtons');
+                buttonsEl.innerHTML = '';
+
+                const confirmBtn = document.createElement('button');
+                confirmBtn.className = `w-full py-3 rounded-2xl font-medium text-base touch-target ${danger ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-teal-600 hover:bg-teal-700 text-white'}`;
+                confirmBtn.textContent = confirmLabel;
+                confirmBtn.onclick = () => { hideCustomModal(); resolve(true); };
+
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = 'w-full py-3 rounded-2xl font-medium text-base touch-target border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200';
+                cancelBtn.textContent = cancelLabel;
+                cancelBtn.onclick = () => { hideCustomModal(); resolve(false); };
+
+                buttonsEl.appendChild(confirmBtn);
+                buttonsEl.appendChild(cancelBtn);
+
+                modal.classList.remove('hidden');
+                modal.onclick = (e) => { if (e.target === modal) { hideCustomModal(); resolve(false); } };
+            });
         }
 
-        // --- FSRS-4.5 ---
+        function showAlertModal(title, message, okLabel = 'ОК') {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('customModal');
+                document.getElementById('modalTitle').textContent = title;
+                document.getElementById('modalMessage').textContent = message;
+                const buttonsEl = document.getElementById('modalButtons');
+                buttonsEl.innerHTML = '';
+
+                const okBtn = document.createElement('button');
+                okBtn.className = 'w-full py-3 rounded-2xl font-medium text-base touch-target bg-teal-600 hover:bg-teal-700 text-white';
+                okBtn.textContent = okLabel;
+                okBtn.onclick = () => { hideCustomModal(); resolve(); };
+                buttonsEl.appendChild(okBtn);
+
+                modal.classList.remove('hidden');
+                modal.onclick = (e) => { if (e.target === modal) { hideCustomModal(); resolve(); } };
+            });
+        }
+
+        function hideCustomModal() {
+            document.getElementById('customModal').classList.add('hidden');
+        }
+
+        function showImportChoiceModal() {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('customModal');
+                document.getElementById('modalTitle').textContent = 'Импорт данных';
+                document.getElementById('modalMessage').textContent = 'Как поступить с текущими данными приложения?';
+                const buttonsEl = document.getElementById('modalButtons');
+                buttonsEl.innerHTML = '';
+
+                const mergeBtn = document.createElement('button');
+                mergeBtn.className = 'w-full py-3 rounded-2xl font-medium text-base touch-target bg-teal-600 hover:bg-teal-700 text-white';
+                mergeBtn.textContent = 'Добавить к существующим';
+                mergeBtn.onclick = () => { hideCustomModal(); resolve('merge'); };
+
+                const replaceBtn = document.createElement('button');
+                replaceBtn.className = 'w-full py-3 rounded-2xl font-medium text-base touch-target bg-red-600 hover:bg-red-700 text-white';
+                replaceBtn.textContent = 'Заменить все данные';
+                replaceBtn.onclick = () => { hideCustomModal(); resolve('replace'); };
+
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = 'w-full py-3 rounded-2xl font-medium text-base touch-target border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200';
+                cancelBtn.textContent = 'Отмена';
+                cancelBtn.onclick = () => { hideCustomModal(); resolve(null); };
+
+                buttonsEl.appendChild(mergeBtn);
+                buttonsEl.appendChild(replaceBtn);
+                buttonsEl.appendChild(cancelBtn);
+
+                modal.classList.remove('hidden');
+                modal.onclick = (e) => { if (e.target === modal) { hideCustomModal(); resolve(null); } };
+            });
+        }
+
+        // ==================== ФСРС ====================
         const FSRS_W = [0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621];
         const FSRS_FACTOR = 19 / 81;
         const FSRS_DECAY = -0.5;
@@ -834,6 +933,56 @@
         function fuzzDays(days) {
             const fuzz = 1 + (Math.random() * 0.1 - 0.05);
             return Math.max(1, days * fuzz);
+        }
+
+        // Превью интервала для кнопок оценки: та же логика переходов состояний,
+        // что и в updateCardAfterReview(), но БЕЗ побочных эффектов — карточка не меняется.
+        // Нужно, чтобы показать пользователю не субъективное "как ты запомнил",
+        // а объективное "когда ты увидишь это слово снова" — это и есть тот сигнал,
+        // по которому реально стоит выбирать оценку.
+        function previewNextDelay(card, grade) {
+            const state = card.state || 'new';
+            if (state === 'new' || state === 'learning') {
+                const step = card.learningStep || 0;
+                if (grade === 1) return { unit: 'min', value: LEARNING_STEPS_MIN[0] };
+                if (grade === 2) return { unit: 'min', value: LEARNING_STEPS_MIN[step] * 1.5 };
+                if (grade === 3) {
+                    const nextStep = step + 1;
+                    if (nextStep >= LEARNING_STEPS_MIN.length) {
+                        return { unit: 'day', value: fsrsIntervalDays(safeStability(fsrsInitialStability(3))) };
+                    }
+                    return { unit: 'min', value: LEARNING_STEPS_MIN[nextStep] };
+                }
+                return { unit: 'day', value: fsrsIntervalDays(safeStability(fsrsInitialStability(4))) };
+            }
+            if (state === 'relearning') {
+                const step = card.learningStep || 0;
+                if (grade === 1) return { unit: 'min', value: RELEARN_STEPS_MIN[0] };
+                if (grade === 2) return { unit: 'min', value: RELEARN_STEPS_MIN[step] * 1.5 };
+                const nextStep = step + 1;
+                if (grade === 4 || nextStep >= RELEARN_STEPS_MIN.length) {
+                    return { unit: 'day', value: fsrsIntervalDays(card.stability) };
+                }
+                return { unit: 'min', value: RELEARN_STEPS_MIN[nextStep] };
+            }
+            // state === 'review'
+            if (grade === 1) return { unit: 'min', value: RELEARN_STEPS_MIN[0] };
+            const now = new Date();
+            const elapsedDays = card.last_review ? Math.max(0, (now - new Date(card.last_review)) / 86400000) : 0;
+            const r = fsrsRetrievability(elapsedDays, card.stability);
+            const newStability = safeStability(fsrsNextStabilityOnSuccess(card.difficulty, card.stability, r, grade));
+            return { unit: 'day', value: fsrsIntervalDays(newStability) };
+        }
+
+        function formatIntervalPreview({ unit, value }) {
+            if (unit === 'min') {
+                const mins = Math.round(value);
+                return mins < 60 ? `${mins} мин` : `${Math.round(mins / 60)} ч`;
+            }
+            const days = Math.max(1, Math.round(value));
+            if (days < 30) return `${days} дн.`;
+            if (days < 365) return `${Math.round(days / 30)} мес.`;
+            return `${(days / 365).toFixed(1)} г.`;
         }
 
         async function updateCardAfterReview(card, grade) {
@@ -899,6 +1048,13 @@
                 }
             } else {
                 const r = fsrsRetrievability(elapsedDays, card.stability);
+                // Реально прожитый и успешно вспомненный интервал (не путать с тем,
+                // что алгоритм ТОЛЬКО ЕЩЁ запланирует после этой оценки) — нужен для
+                // достижений "Долгая память"/"Вечность", чтобы их нельзя было получить
+                // за счёт быстрого роста стабильности от нескольких подряд "Легко".
+                if (grade >= 3) {
+                    card.maxRealizedIntervalDays = Math.max(card.maxRealizedIntervalDays || 0, elapsedDays);
+                }
                 if (grade === 1) {
                     card.lapses++;
                     const newStability = fsrsNextStabilityOnFail(card.difficulty, card.stability, r);
@@ -916,6 +1072,7 @@
                 }
             }
             card.last_review = now.toISOString();
+            card.lastGrade = grade;
             await saveData();
         }
 
@@ -930,12 +1087,12 @@
             delete card.stability;
             delete card.difficulty;
             delete card.learningStep;
+            delete card.maxRealizedIntervalDays;
             card.last_review = null;
             card.nextReviewDate = new Date().toISOString();
             card.masteredSuggestionDismissed = false;
         }
 
-        // ==================== ПОЛУЧЕНИЕ DUE-КАРТОЧЕК ====================
         function getDueCardsFromArray(cards) {
             const now = new Date();
             return cards
@@ -949,6 +1106,26 @@
                     const db = new Date(b.nextReviewDate || 0);
                     return da - db;
                 });
+        }
+
+        // Лимит применяется ТОЛЬКО к новым (ещё не изучавшимся) карточкам — это
+        // единственное, для чего дневной лимит научно оправдан (защита от перегрузки
+        // рабочей памяти и интерференции при кодировании новой информации). Карточки
+        // на повторение (review/relearning/learning) не режутся числом — по науке их
+        // лучше ограничивать временем самой сессии, а не искусственным счётчиком,
+        // иначе при большом бэклоге лимит просто блокирует прогресс по уже знакомым словам.
+        function applyDailyLimit(cards) {
+            if (!dailyLimitEnabled) return cards;
+            let newCount = 0;
+            const result = [];
+            for (const card of cards) {
+                if (card.state === 'new') {
+                    if (newCount >= dailyLimitCount) continue;
+                    newCount++;
+                }
+                result.push(card);
+            }
+            return result;
         }
 
         function getTimeUntilNextReview(cards) {
@@ -966,7 +1143,7 @@
             return { text, date: new Date(soonest.nextReviewDate) };
         }
 
-        // --- Статистика и достижения ---
+        // ==================== СТАТИСТИКА И ДОСТИЖЕНИЯ ====================
         function localDateKey(date) {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -978,6 +1155,10 @@
             const key = localDateKey(new Date());
             if (!stats.studyDates.includes(key)) {
                 stats.studyDates.push(key);
+                const streakNow = currentStreak();
+                if (streakNow > (stats.longestStreak || 0)) {
+                    stats.longestStreak = streakNow;
+                }
                 await saveStats();
             }
         }
@@ -985,14 +1166,15 @@
         function currentStreak() {
             if (!stats.studyDates || stats.studyDates.length === 0) return 0;
             const daySet = new Set(stats.studyDates);
+            const prevCalendarDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1);
             let streak = 0;
             let cursor = new Date();
             if (!daySet.has(localDateKey(cursor))) {
-                cursor = addDays(cursor, -1);
+                cursor = prevCalendarDay(cursor);
             }
             while (daySet.has(localDateKey(cursor))) {
                 streak++;
-                cursor = addDays(cursor, -1);
+                cursor = prevCalendarDay(cursor);
             }
             return streak;
         }
@@ -1042,6 +1224,9 @@
             let totalImages = stats.totalImages || 0;
             let totalFlips = stats.totalFlips || 0;
             let maxConsecutiveCorrect = stats.maxConsecutiveCorrect || 0;
+            let maxStability = 0;
+            let cardsWithStabilityOver100 = 0;
+            let maxRealizedInterval = 0;
 
             folders.forEach(f => f.cards.forEach(c => {
                 total++;
@@ -1051,45 +1236,78 @@
                 else statNew++;
                 totalReps += c.reps || 0;
                 totalLapses += c.lapses || 0;
-                if (typeof c.stability === 'number') { stabilitySum += c.stability; stabilityCount++; }
+                if (typeof c.stability === 'number') {
+                    stabilitySum += c.stability; stabilityCount++;
+                    if (c.stability > maxStability) maxStability = c.stability;
+                    if (c.stability > 100) cardsWithStabilityOver100++;
+                }
+                if (c.maxRealizedIntervalDays && c.maxRealizedIntervalDays > maxRealizedInterval) {
+                    maxRealizedInterval = c.maxRealizedIntervalDays;
+                }
             }));
             const percentCorrect = totalReps > 0 ? Math.max(0, Math.round((1 - totalLapses / totalReps) * 100)) : null;
             const avgStability = stabilityCount > 0 ? (stabilitySum / stabilityCount) : null;
             const learnedCount = statReview + statRelearning;
             const todayStats = getTodayStats();
+            const masteredCount = (folders.find(f => f.system) || { cards: [] }).cards.length;
+            const maxInterval = Math.round(maxRealizedInterval);
 
-            return { total, statNew, statLearning, statReview, statRelearning, totalReps, totalLapses, percentCorrect, avgStability, learnedCount, totalImages, totalFlips, maxConsecutiveCorrect, todayStats };
+            return { total, statNew, statLearning, statReview, statRelearning, totalReps, totalLapses, percentCorrect, avgStability, learnedCount, totalImages, totalFlips, maxConsecutiveCorrect, todayStats, masteredCount, maxInterval, cardsWithStabilityOver100 };
         }
 
-        // Достижения объявлены здесь, но код продолжается
+        // Сколько дней прошло с ПРЕДЫДУЩЕГО (не сегодняшнего) дня занятий —
+        // нужно для достижения "Возвращение". recordStudyActivity() уже
+        // добавляет сегодняшнюю дату к моменту вызова checkAchievements(),
+        // поэтому сегодняшний день явно исключается из поиска.
+        function daysSincePreviousStudy() {
+            if (!stats.studyDates || stats.studyDates.length < 2) return 0;
+            const todayKey = localDateKey(new Date());
+            const prevDates = [...new Set(stats.studyDates)].filter(d => d !== todayKey).sort();
+            if (prevDates.length === 0) return 0;
+            const lastPrev = new Date(prevDates[prevDates.length - 1]);
+            const today = new Date(todayKey);
+            return Math.round((today - lastPrev) / 86400000);
+        }
+
+        // Достижения. Все метрики завязаны на реальную практику (learnedCount/masteredCount
+        // требуют состояния review/relearning или прохождения через архивный порог reps>=5,
+        // streak — на физически прожитые дни, maxInterval/stability — на реально
+        // прошедшее время между повторами) — простой импорт JSON/текста ничего из этого
+        // не даёт, т.к. импортированные карточки создаются в состоянии 'new'.
         const ACHIEVEMENTS = [
-            { id: 'first_step', icon: '🌱', title: 'Первый шаг', desc: 'Выучить 1 слово (довести до «На повторении»)', category: 'Объём', check: (g) => g.learnedCount >= 1 },
-            { id: 'novice', icon: '📗', title: 'Новичок', desc: '10 слов на повторении', category: 'Объём', check: (g) => g.learnedCount >= 10 },
-            { id: 'student', icon: '📘', title: 'Ученик', desc: '50 слов на повторении', category: 'Объём', check: (g) => g.learnedCount >= 50 },
-            { id: 'master', icon: '📙', title: 'Знаток', desc: '100 слов на повторении', category: 'Объём', check: (g) => g.learnedCount >= 100 },
-            { id: 'polyglot', icon: '🌍', title: 'Полиглот', desc: '200 слов на повторении', category: 'Объём', check: (g) => g.learnedCount >= 200 },
-            { id: 'erudite', icon: '🧠', title: 'Эрудит', desc: '500 слов на повторении', category: 'Объём', check: (g) => g.learnedCount >= 500 },
-            { id: 'language_master', icon: '👑', title: 'Мастер языка', desc: '1000 слов на повторении', category: 'Объём', check: (g) => g.learnedCount >= 1000 },
-            { id: 'lexicon', icon: '📚', title: 'Лексикон', desc: '2000 слов на повторении', category: 'Объём', check: (g) => g.learnedCount >= 2000 },
-            { id: 'enthusiast', icon: '🔥', title: 'Энтузиаст', desc: '7 дней подряд занятий', category: 'Серия дней', check: (g, streak) => streak >= 7 },
-            { id: 'persistent', icon: '💪', title: 'Упорный', desc: '30 дней подряд занятий', category: 'Серия дней', check: (g, streak) => streak >= 30 },
-            { id: 'dedicated', icon: '🗓️', title: 'Преданный', desc: '60 дней подряд занятий', category: 'Серия дней', check: (g, streak) => streak >= 60 },
-            { id: 'legendary', icon: '🏰', title: 'Легенда', desc: '100 дней подряд занятий', category: 'Серия дней', check: (g, streak) => streak >= 100 },
-            { id: 'immortal', icon: '🕊️', title: 'Бессмертный', desc: '365 дней подряд занятий', category: 'Серия дней', check: (g, streak) => streak >= 365 },
-            { id: 'stable', icon: '🎯', title: 'Стабильный', desc: '10 правильных ответов подряд', category: 'Точность', check: (g) => g.maxConsecutiveCorrect >= 10 },
-            { id: 'sniper', icon: '🔫', title: 'Снайпер', desc: '50 правильных ответов подряд', category: 'Точность', check: (g) => g.maxConsecutiveCorrect >= 50 },
-            { id: 'accuracy_master', icon: '💎', title: 'Мастер точности', desc: '100 правильных ответов подряд', category: 'Точность', check: (g) => g.maxConsecutiveCorrect >= 100 },
-            { id: 'sprinter', icon: '🏃', title: 'Спринтер', desc: '20 повторений за один день', category: 'Интенсивность', check: (g, streak, foldersCount, today) => today && today.total >= 20 },
-            { id: 'marathoner', icon: '🏅', title: 'Марафонец', desc: '50 повторений за один день', category: 'Интенсивность', check: (g, streak, foldersCount, today) => today && today.total >= 50 },
-            { id: 'ultra_marathoner', icon: '⚡', title: 'Ультрамарафонец', desc: '100 повторений за один день', category: 'Интенсивность', check: (g, streak, foldersCount, today) => today && today.total >= 100 },
-            { id: 'deck_collector', icon: '🗂️', title: 'Собиратель колод', desc: 'Создать 5 колод', category: 'Контент', check: (g, streak, foldersCount) => foldersCount >= 5 },
-            { id: 'architect', icon: '🏗️', title: 'Архитектор', desc: 'Создать 10 колод', category: 'Контент', check: (g, streak, foldersCount) => foldersCount >= 10 },
-            { id: 'photographer', icon: '📸', title: 'Фотограф', desc: 'Добавить 10 изображений к карточкам', category: 'Контент', check: (g) => g.totalImages >= 10 },
-            { id: 'researcher', icon: '🔬', title: 'Исследователь', desc: 'Использовать все 4 типа оценки за день', category: 'Контент', check: (g, streak, foldersCount, today) => today && today.usedAllGrades === true },
-            { id: 'rep_master', icon: '⚡', title: 'Мастер повторений', desc: '1000 повторений карточек', category: 'Активность', check: (g) => g.totalReps >= 1000 },
-            { id: 'rep_legend', icon: '💫', title: 'Легенда повторений', desc: '5000 повторений карточек', category: 'Активность', check: (g) => g.totalReps >= 5000 },
-            { id: 'flip_master', icon: '🔄', title: 'Мастер переворота', desc: '500 переворотов карточки', category: 'Активность', check: (g) => g.totalFlips >= 500 },
-            { id: 'perfect_day', icon: '⭐', title: 'Идеальный день', desc: '100% правильных ответов за день (минимум 10 карточек)', category: 'Особые', check: (g, streak, foldersCount, today) => today && today.total >= 10 && today.correct === today.total }
+            // ---- Первые шаги ----
+            { id: 'first_step', icon: '🌱', title: 'Первый шаг', desc: 'Выучить 1 слово (довести до «На повторении»)', category: 'Активность', check: (g) => g.learnedCount >= 1 },
+            { id: 'first_photo', icon: '📷', title: 'Первое фото', desc: 'Добавить фото к слову', category: 'Контент', check: (g) => g.totalImages >= 1 },
+            { id: 'first_archive', icon: '🏆', title: 'Первый архив', desc: 'Отправить первое слово в архив', category: 'Контент', check: (g) => g.masteredCount >= 1 },
+
+            // ---- Привычка (серии дней) ----
+            { id: 'streak_3', icon: '🔥', title: 'Разминка', desc: 'Заниматься 3 дня подряд', category: 'Серия дней', check: (g, streak) => streak >= 3 },
+            { id: 'streak_7', icon: '🔥', title: 'Неделя', desc: 'Заниматься 7 дней подряд', category: 'Серия дней', check: (g, streak) => streak >= 7 },
+            { id: 'streak_30', icon: '🔥', title: 'Месяц', desc: 'Заниматься 30 дней подряд', category: 'Серия дней', check: (g, streak) => streak >= 30 },
+            { id: 'streak_100', icon: '🔥', title: 'Сотня', desc: 'Заниматься 100 дней подряд', category: 'Серия дней', check: (g, streak) => streak >= 100 },
+
+            // ---- Объём выученного ----
+            { id: 'learned_10', icon: '📚', title: 'Первые десять', desc: 'Выучить 10 слов', category: 'Объём', check: (g) => g.learnedCount >= 10 },
+            { id: 'learned_50', icon: '📚', title: 'Полсотни', desc: 'Выучить 50 слов', category: 'Объём', check: (g) => g.learnedCount >= 50 },
+            { id: 'learned_200', icon: '📚', title: 'Двести', desc: 'Выучить 200 слов', category: 'Объём', check: (g) => g.learnedCount >= 200 },
+            { id: 'learned_500', icon: '📚', title: 'Пятьсот', desc: 'Выучить 500 слов', category: 'Объём', check: (g) => g.learnedCount >= 500 },
+
+            // ---- Качество FSRS ----
+            { id: 'long_memory_90', icon: '🧠', title: 'Долгая память', desc: 'Довести интервал повторения слова до 90 дней', category: 'Интенсивность', check: (g) => g.maxInterval >= 90 },
+            { id: 'stable_foundation', icon: '🏛️', title: 'Крепкий фундамент', desc: 'Довести стабильность слова выше 100', category: 'Интенсивность', check: (g) => g.cardsWithStabilityOver100 >= 1 },
+            { id: 'accuracy_90', icon: '🎯', title: 'Меткость', desc: 'Точность 90%+ (не менее 50 повторений)', category: 'Точность', check: (g) => g.totalReps >= 50 && g.percentCorrect !== null && g.percentCorrect >= 90 },
+
+            // ---- Психология ----
+            { id: 'comeback', icon: '🌅', title: 'Возвращение', desc: 'Вернуться к занятиям после перерыва в 3+ дня', category: 'Особые', check: () => daysSincePreviousStudy() >= 3 },
+
+            // ---- Ручной контент ----
+            { id: 'photographer', icon: '📸', title: 'Фотограф', desc: 'Добавить 20 фото к словам', category: 'Контент', check: (g) => g.totalImages >= 20 },
+
+            // ---- Престижные (дальний горизонт, месяцы регулярной практики) ----
+            { id: 'anniversary', icon: '🎂', title: 'Годовщина', desc: 'Заниматься 365 дней подряд', category: 'Особые', check: (g, streak) => streak >= 365 },
+            { id: 'thousand', icon: '🏅', title: 'Тысяча', desc: 'Выучить 1000 слов, занимаясь минимум 90 разных дней', category: 'Особые', check: (g) => g.learnedCount >= 1000 && (stats.studyDates?.length || 0) >= 90 },
+            { id: 'eternity', icon: '♾️', title: 'Вечность', desc: 'Довести интервал повторения слова до 365 дней', category: 'Особые', check: (g) => g.maxInterval >= 365 },
+            { id: 'archive_master', icon: '🏛️', title: 'Архивариус-мастер', desc: '200 карточек в архиве', category: 'Особые', check: (g) => g.masteredCount >= 200 },
         ];
 
         let achievementQueue = [];
@@ -1099,14 +1317,12 @@
             const streak = currentStreak();
             const todayStats = getTodayStats();
             const newlyUnlocked = [];
-
             ACHIEVEMENTS.forEach(a => {
                 if (!stats.unlocked[a.id] && a.check(g, streak, folders.length, todayStats)) {
                     stats.unlocked[a.id] = true;
                     newlyUnlocked.push(a);
                 }
             });
-
             if (newlyUnlocked.length > 0) {
                 await saveStats();
                 showAchievementQueue(newlyUnlocked);
@@ -1135,7 +1351,23 @@
             if (achievementQueue.length > 0) setTimeout(showNextAchievement, 250);
         }
 
+        function buildActivityHeatmap() {
+            const daySet = new Set(stats.studyDates);
+            const today = new Date();
+            let html = '<div class="grid grid-cols-7 gap-1.5 justify-items-center">';
+            for (let i = 34; i >= 0; i--) {
+                const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+                const active = daySet.has(localDateKey(d));
+                const isToday = i === 0;
+                const label = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+                html += `<div class="w-full aspect-square rounded-md ${active ? 'bg-teal-500 dark:bg-teal-400' : 'bg-slate-100 dark:bg-slate-800'} ${isToday ? 'ring-2 ring-offset-1 ring-teal-600 dark:ring-teal-300 dark:ring-offset-slate-900' : ''}" title="${label}${active ? ' — занимался' : ''}"></div>`;
+            }
+            html += '</div>';
+            return html;
+        }
+
         function showStatsView() {
+            resetSelectionState();
             document.getElementById('current-folder-name').textContent = 'Статистика';
             const g = computeGlobalStats();
             const streak = currentStreak();
@@ -1177,6 +1409,7 @@
                         <div class="stat-card">
                             <div class="text-3xl font-bold text-orange-500">🔥 ${streak}</div>
                             <div class="stat-label">дней подряд</div>
+                            ${stats.longestStreak > streak ? `<div class="text-xs text-slate-400 mt-0.5">рекорд: ${stats.longestStreak}</div>` : ''}
                         </div>
                         <div class="stat-card">
                             <div class="text-3xl font-bold text-emerald-500">${g.percentCorrect !== null ? g.percentCorrect + '%' : '—'}</div>
@@ -1212,6 +1445,10 @@
                             <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Переучиваются</span><span class="font-medium">${g.statRelearning}</span></div>
                         </div>
                     </div>
+                    <div class="panel">
+                        <div class="font-semibold text-base mb-3">Активность за 5 недель</div>
+                        ${buildActivityHeatmap()}
+                    </div>
                     <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4">
                         <div class="font-semibold text-base mb-3">Достижения</div>
                         ${achievementsHtml}
@@ -1220,7 +1457,7 @@
             `;
         }
 
-        // ==================== АРХИВ "ИЗУЧЕННЫЕ СЛОВА" ====================
+        // ==================== АРХИВ И ПЕРЕМЕЩЕНИЯ ====================
         async function moveCardToMastered(card) {
             if (!card) return;
             const currentFolder = getCurrentFolder();
@@ -1235,8 +1472,11 @@
             if (!editingCardId) return;
             const folder = getCurrentFolder();
             const card = folder.cards.find(c => c.id === editingCardId);
-            if (!card || !confirm('Переместить эту карточку в «Изученные слова»?')) return;
+            if (!card) return;
+            const ok = await showConfirmModal('Переместить в архив', 'Переместить эту карточку в «Изученные слова»?', { confirmLabel: 'Переместить', danger: false });
+            if (!ok) return;
             await moveCardToMastered(card);
+            sessionStableCandidates = sessionStableCandidates.filter(c => c.id !== editingCardId);
             closeEditModalAndReturn();
         }
 
@@ -1246,7 +1486,7 @@
             if (!card) return;
             const otherFolders = folders.filter(f => f.id !== mastered.id);
             if (otherFolders.length === 0) {
-                alert('Нет других колод для возврата');
+                await showAlertModal('Информация', 'Нет других колод для возврата');
                 return;
             }
             const modal = document.createElement('div');
@@ -1282,7 +1522,7 @@
             const card = masteredFolder.cards.find(c => c.id === cardId);
             if (!card || !targetFolder) return;
             if (targetFolder.cards.some(c => c.id === cardId)) {
-                alert('Эта карточка уже есть в выбранной колоде');
+                await showAlertModal('Информация', 'Эта карточка уже есть в выбранной колоде');
                 modal.remove();
                 return;
             }
@@ -1295,33 +1535,44 @@
 
         function shouldSuggestMastered(card) {
             if (!card) return false;
+            if (archiveThresholdDays === 0) return false; // пользователь выбрал "Никогда"
+            if (card.state !== 'review') return false;
             if (!card.stability || card.stability < 25) return false;
-            if (card.difficulty > 4.0) return false;
-            if (card.reps < 5) return false;
-            if (card.state === 'relearning') return false;
             if (card.masteredSuggestionDismissed) return false;
-            if (card.lastGrade === 1) return false;
-            return true;
+            // Требуем, чтобы ПОСЛЕДНЯЯ оценка была не хуже "Хорошо" — свежее "Трудно"
+            // или "Забыл" сигналит, что рано предлагать архив, даже если стабильность
+            // уже высокая после прошлой истории.
+            if ((card.lastGrade || 0) < 3) return false;
+            // difficulty сознательно не фильтруется: она уже отражена в том, как
+            // накопилась stability, и повторная фильтрация по ней почти не меняет
+            // результат (проверено — разница в устойчивости к провалу минимальна).
+            //
+            // ВАЖНО: тут нет проверки на card.reps — и это не упущение. Один повтор
+            // с любой оценкой не может дать интервал больше 15.691 дня (детерминированная
+            // константа для grade=4 при текущих FSRS_W, без fuzz). Это верно СТРОГО ПОКА
+            // минимальный порог, доступный в настройках (archive-threshold-select ниже
+            // по файлу), больше этого числа — сейчас минимум 30, запас x1.9.
+            // Если когда-нибудь добавите вариант порога меньше ~16 дней — это условие
+            // перестанет защищать от срабатывания на одной случайной оценке, и проверку
+            // на reps нужно будет вернуть.
+            const provenInterval = card.maxRealizedIntervalDays || 0;
+            const projectedInterval = fsrsIntervalDays(card.stability);
+            return provenInterval >= archiveThresholdDays || projectedInterval >= archiveThresholdDays;
         }
 
-
-        // ==================== Показ стабильных слов в конце сессии ====================
+        // ==================== ПОКАЗ СТАБИЛЬНЫХ СЛОВ ====================
         function showEndOfSessionStableReview() {
             if (!sessionStableCandidates || sessionStableCandidates.length === 0) return;
-
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[120]';
-            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-
+            modal.onclick = (e) => { if (e.target === modal) { modal.remove(); sessionStableCandidates = []; } };
             let html = `
                 <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[440px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
                     <div class="font-semibold text-xl mb-2">Слова, которые вы уверенно помните</div>
                     <div class="text-sm text-slate-600 dark:text-slate-400 mb-4">Эти слова имеют высокую стабильность. Вы можете отправить их в архив, чтобы они реже повторялись.</div>
-                    
                     <div class="max-h-[280px] overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-2xl mb-4">
             `;
-
-            sessionStableCandidates.forEach((card, index) => {
+            sessionStableCandidates.forEach((card) => {
                 const stability = card.stability ? Math.round(card.stability) : '?';
                 html += `
                     <label class="flex items-center gap-3 px-4 py-3 border-b border-slate-100 dark:border-slate-700 last:border-b-0 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50">
@@ -1334,27 +1585,15 @@
                     </label>
                 `;
             });
-
             html += `
                     </div>
-
                     <div class="flex flex-col gap-2">
-                        <button onclick="confirmMoveStableWordsToArchive(this)" 
-                                class="w-full py-3 rounded-2xl bg-emerald-600 text-white font-medium text-base touch-target">
-                            Отправить выбранные в архив
-                        </button>
-                        <button onclick="moveAllStableWordsToArchive(this)" 
-                                class="w-full py-3 rounded-2xl border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 font-medium text-base touch-target">
-                            Отправить все
-                        </button>
-                        <button onclick="this.closest('.fixed').remove(); sessionStableCandidates = [];" 
-                                class="w-full py-3 text-sm text-slate-500 dark:text-slate-400 touch-target">
-                            Позже
-                        </button>
+                        <button onclick="confirmMoveStableWordsToArchive(this)" class="w-full py-3 rounded-2xl bg-emerald-600 text-white font-medium text-base touch-target">Отправить выбранные в архив</button>
+                        <button onclick="moveAllStableWordsToArchive(this)" class="w-full py-3 rounded-2xl border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 font-medium text-base touch-target">Отправить все</button>
+                        <button onclick="this.closest('.fixed').remove(); sessionStableCandidates = [];" class="w-full py-3 text-sm text-slate-500 dark:text-slate-400 touch-target">Позже</button>
                     </div>
                 </div>
             `;
-
             modal.innerHTML = html;
             document.body.appendChild(modal);
         }
@@ -1363,7 +1602,6 @@
             const modal = btnElement.closest('.fixed');
             const checkboxes = modal.querySelectorAll('input[type="checkbox"]:checked');
             const idsToMove = Array.from(checkboxes).map(cb => cb.dataset.cardId);
-
             await moveSelectedCardsToMastered(idsToMove);
             modal.remove();
             sessionStableCandidates = [];
@@ -1379,61 +1617,37 @@
 
         async function moveSelectedCardsToMastered(ids) {
             if (!ids || ids.length === 0) return;
-
             const masteredFolder = getMasteredFolder();
-            const currentFolder = getCurrentFolder();
-
             for (const id of ids) {
-                const cardIndex = currentFolder.cards.findIndex(c => c.id === id);
-                if (cardIndex === -1) continue;
-
-                const card = currentFolder.cards[cardIndex];
+                const { card, folder: sourceFolder } = findCardAndFolderById(id);
+                if (!card || !sourceFolder || sourceFolder.id === masteredFolder.id) continue;
                 if (masteredFolder.cards.some(c => c.id === id)) continue;
-
-                currentFolder.cards.splice(cardIndex, 1);
+                sourceFolder.cards = sourceFolder.cards.filter(c => c.id !== id);
                 masteredFolder.cards.push(card);
             }
-
             await debouncedSaveData();
             dueCards = dueCards.filter(c => !ids.includes(c.id));
         }
 
         // ==================== СЖАТИЕ ИЗОБРАЖЕНИЙ ====================
-        function compressImage(file, maxWidth = 600, quality = 0.7) {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        let w = img.width, h = img.height;
-                        if (w > maxWidth) { h = (h * maxWidth) / w; w = maxWidth; }
-                        canvas.width = w; canvas.height = h;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, w, h);
-                        resolve(canvas.toDataURL('image/jpeg', quality));
-                    };
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-            });
-        }
-
         async function compressAndSetImage(card, file) {
             const blob = await compressImageToBlob(file);
-            if (!blob) return;
-
-            const imageId = 'img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 11);
-
-            const savedId = await MediaStore.saveImage(imageId, blob);
-            if (!savedId) {
-                alert('Не удалось сохранить изображение');
+            if (!blob) {
+                await showAlertModal('Ошибка', 'Не удалось обработать изображение. Убедитесь, что выбран корректный файл фото, и попробуйте снова.');
                 return;
             }
-
+            const imageId = 'img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 11);
+            const savedId = await MediaStore.saveImage(imageId, blob);
+            if (!savedId) {
+                await showAlertModal('Ошибка', 'Не удалось сохранить изображение. Возможно, закончилось место в кэше устройства.');
+                return;
+            }
+            const oldImageId = card.imageId;
             card.image = null;
             card.imageId = imageId;
-
+            if (oldImageId && oldImageId !== imageId) {
+                await MediaStore.deleteImage(oldImageId);
+            }
             await debouncedSaveData();
             await recordPhotoAdded();
             await checkAchievements();
@@ -1443,9 +1657,7 @@
         function setTheme(mode) {
             const html = document.documentElement;
             localStorage.setItem('themeMode', mode);
-
             document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
-
             let isDark;
             if (mode === 'light') {
                 isDark = false;
@@ -1460,7 +1672,6 @@
                 isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
                 html.classList.toggle('dark', isDark);
             }
-
             const metaTheme = document.querySelector('meta[name="theme-color"]');
             if (metaTheme) metaTheme.setAttribute('content', isDark ? '#0f172a' : '#ffffff');
         }
@@ -1468,7 +1679,6 @@
         function initTheme() {
             const saved = localStorage.getItem('themeMode') || 'auto';
             setTheme(saved);
-
             const media = window.matchMedia('(prefers-color-scheme: dark)');
             media.addEventListener('change', () => {
                 if (localStorage.getItem('themeMode') === 'auto') {
@@ -1492,8 +1702,18 @@
             return results;
         }
 
+        // ==================== ПОИСК КАРТОЧКИ ПО ID (для мультивыбора) ====================
+        function findCardAndFolderById(cardId) {
+            for (const folder of folders) {
+                const card = (folder.cards || []).find(c => c.id === cardId);
+                if (card) return { card, folder };
+            }
+            return { card: null, folder: null };
+        }
+
         // ==================== UI ====================
         async function showFoldersView(initialQuery = '') {
+            resetSelectionState();
             document.getElementById('current-folder-name').textContent = 'Мои колоды';
             const container = document.getElementById('main-content');
             const oldUndo = document.getElementById('undo-review-btn');
@@ -1536,7 +1756,8 @@
 
                         if (isSystem) {
                             html += `
-                                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 opacity-75">
+                                <div id="folder-${f.id}" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 opacity-75 cursor-pointer active:scale-[0.985] transition-all duration-100 touch-target"
+                                     onclick="selectFolder('${f.id}')">
                                     <div class="flex justify-between items-center">
                                         <div>
                                             <div class="font-semibold text-lg">${escapeHtml(f.name)}</div>
@@ -1552,13 +1773,8 @@
                         html += `
                             <div id="folder-${f.id}" 
                                  class="group relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 active:scale-[0.985] transition-all duration-100 touch-target ${isHidden ? 'opacity-50' : ''}">
-                                
                                 <div class="flex items-center justify-between gap-x-3">
-                                    
-                                    <!-- Левая часть -->
-                                    <div class="flex min-w-0 flex-1 items-center gap-x-3 cursor-pointer" 
-                                         onclick="selectFolder('${f.id}')">
-                                        
+                                    <div class="flex min-w-0 flex-1 items-center gap-x-3 cursor-pointer" onclick="selectFolder('${f.id}')">
                                         <div class="min-w-0 flex-1">
                                             <div class="font-semibold text-[17px] leading-snug text-slate-900 dark:text-white truncate">
                                                 ${escapeHtml(f.name)}
@@ -1567,16 +1783,12 @@
                                                 ${f.cards.length} слов
                                             </div>
                                         </div>
-
-                                        <!-- Глазок -->
                                         <button onclick="event.stopImmediatePropagation(); toggleFolderHidden('${f.id}', event)"
                                                 class="text-slate-400 hover:text-slate-600 active:text-slate-700 text-[22px] flex-shrink-0 touch-target px-1 -mr-1"
                                                 title="Скрыть / показать колоду">
                                             <i class="fa-solid ${isHidden ? 'fa-eye-slash' : 'fa-eye'}"></i>
                                         </button>
                                     </div>
-
-                                    <!-- Кнопка "Учить" -->
                                     <button onclick="event.stopImmediatePropagation(); startStudyWithFolder('${f.id}')"
                                             class="flex items-center justify-center gap-x-2 rounded-2xl bg-teal-600 active:bg-teal-700 px-4 py-[9px] text-[15px] font-semibold text-white shadow-sm active:shadow-none transition-all touch-target flex-shrink-0"
                                             title="Начать обучение по этой колоде">
@@ -1595,16 +1807,14 @@
                     document.querySelectorAll('[id^="folder-"]').forEach(el => {
                         const folderId = el.id.replace('folder-', '');
                         let pressTimer = null;
-
                         el.addEventListener('touchstart', () => {
                             el.style.transition = 'transform 0.08s ease';
                             el.style.transform = 'scale(0.985)';
                             pressTimer = setTimeout(() => {
                                 if (navigator.vibrate) navigator.vibrate(20);
                                 showFolderContextMenu(folderId);
-                            }, 520);
+                            }, CONSTANTS.LONG_PRESS_DURATION_MS);
                         }, { passive: true });
-
                         el.addEventListener('touchend', () => {
                             clearTimeout(pressTimer);
                             el.style.transform = 'scale(1)';
@@ -1625,7 +1835,7 @@
                     return;
                 }
 
-                // Поиск (без изменений)
+                // Поиск
                 const results = searchWords(query);
                 resultsDiv.innerHTML = results.length === 0
                     ? `<div class="text-center py-6 text-slate-500 dark:text-slate-400">Ничего не найдено</div>`
@@ -1648,11 +1858,34 @@
             showFolderCards(folderId);
         }
 
-        async function createFolder() {
-            const name = prompt('Название новой колоды:');
-            if (!name || !name.trim()) return;
-            folders.push({ id: 'folder_' + Date.now(), name: name.trim(), cards: [], system: false });
+        function createFolder() {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]';
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+            modal.innerHTML = `
+                <div onclick="event.stopImmediatePropagation()" class="modal-panel-sm">
+                    <div class="font-semibold text-xl mb-4">Новая колода</div>
+                    <div class="mb-4">
+                        <label class="block text-sm mb-1">Название</label>
+                        <input type="text" id="new-folder-input" placeholder="Например, «Английский B1»" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-base touch-target">
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="this.closest('.fixed').remove()" class="btn-secondary-half">Отмена</button>
+                        <button onclick="saveNewFolder(this)" class="btn-primary-half">Создать</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            setTimeout(() => modal.querySelector('#new-folder-input')?.focus(), 100);
+        }
+
+        async function saveNewFolder(btn) {
+            const modal = btn.closest('.fixed');
+            const name = modal.querySelector('#new-folder-input').value.trim();
+            if (!name) return;
+            folders.push({ id: 'folder_' + Date.now(), name: name, cards: [], system: false });
             await saveData();
+            modal.remove();
             showFoldersView();
             await checkAchievements();
         }
@@ -1672,7 +1905,7 @@
             const folder = folders.find(f => f.id === folderId);
             if (folder) folder.hidden = false;
             await saveData();
-            startStudy();
+            startStudyWithFolder(folderId);
         }
 
         // ==================== КОНТЕКСТНОЕ МЕНЮ ДЛЯ КОЛОД ====================
@@ -1686,7 +1919,7 @@
             menu.className = 'context-menu';
             menu.onclick = (e) => e.stopPropagation();
             menu.innerHTML = `
-                <button class="context-menu-item" data-action="rename"><i class="fa-solid fa-pen"></i> Переименовать</button>
+                ${folder.system ? '' : `<button class="context-menu-item" data-action="rename"><i class="fa-solid fa-pen"></i> Переименовать</button>`}
                 <button class="context-menu-item" data-action="reset"><i class="fa-solid fa-rotate-left"></i> Сбросить прогресс</button>
                 ${folder.system ? '' : `
                 <button class="context-menu-item" data-action="toggle-hidden"><i class="fa-solid ${folder.hidden ? 'fa-eye' : 'fa-eye-slash'}"></i> ${folder.hidden ? 'Показать колоду' : 'Скрыть колоду'}</button>
@@ -1696,10 +1929,13 @@
             `;
             overlay.appendChild(menu);
             document.body.appendChild(overlay);
-            menu.querySelector('[data-action="rename"]').addEventListener('click', () => {
-                overlay.remove();
-                showRenameFolderModal(folderId);
-            });
+            const renameBtn = menu.querySelector('[data-action="rename"]');
+            if (renameBtn) {
+                renameBtn.addEventListener('click', () => {
+                    overlay.remove();
+                    showRenameFolderModal(folderId);
+                });
+            }
             menu.querySelector('[data-action="reset"]').addEventListener('click', () => {
                 overlay.remove();
                 resetSelectedFolderProgress(folderId);
@@ -1713,9 +1949,10 @@
             }
             const deleteBtn = menu.querySelector('[data-action="delete"]');
             if (deleteBtn) {
-                deleteBtn.addEventListener('click', () => {
+                deleteBtn.addEventListener('click', async () => {
                     overlay.remove();
-                    if (confirm(`Удалить колоду «${folder.name}»?`)) {
+                    const ok = await showConfirmModal('Удалить колоду', `Удалить колоду «${folder.name}»? Все карточки внутри будут удалены безвозвратно.`, { confirmLabel: 'Удалить' });
+                    if (ok) {
                         performDeleteFolder(folderId);
                         showFoldersView();
                     }
@@ -1749,7 +1986,7 @@
         async function saveRenamedFolder(folderId, btn) {
             const modal = btn.closest('.fixed');
             const newName = modal.querySelector('#rename-input').value.trim();
-            if (!newName) return alert('Название не может быть пустым');
+            if (!newName) return await showAlertModal('Ошибка', 'Название не может быть пустым');
             const folder = folders.find(f => f.id === folderId);
             if (folder) folder.name = newName;
             if (currentFolderId === folderId) document.getElementById('current-folder-name').textContent = newName;
@@ -1758,16 +1995,214 @@
             showFoldersView();
         }
 
+        // ==================== ОТРИСОВКА КАРТОЧЕК В ПАПКЕ (МУЛЬТИВЫБОР) ====================
+        function renderCardRow(card) {
+            const isSelected = selectedCardIds.has(card.id);
+            const row = document.createElement('div');
+            row.className = `flex items-center justify-between p-4 rounded-2xl mb-2 touch-target transition-all ${isSelected ? 'bg-white dark:bg-slate-800 ring-2 ring-teal-500 border-teal-500' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700'}`;
+
+            if (selectionMode) {
+                row.innerHTML = `
+                    <div class="flex items-center flex-1" onclick="toggleCardSelection('${card.id}')">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                               class="w-5 h-5 mr-3 accent-teal-600 pointer-events-none">
+                        <div>
+                            <div class="font-medium">${escapeHtml(card.english)}</div>
+                            <div class="text-sm text-slate-500 dark:text-slate-400">${escapeHtml(card.russian)}</div>
+                        </div>
+                    </div>
+                    <button onclick="event.stopImmediatePropagation(); uploadImageForCard('${card.id}')" 
+                            class="text-slate-400 hover:text-teal-600 touch-target px-2"><i class="fa-solid fa-camera"></i></button>
+                `;
+            } else {
+                row.innerHTML = `
+                    <div class="flex-1 cursor-pointer" onclick="viewCard('${card.id}')">
+                        <div class="font-medium">${escapeHtml(card.english)}</div>
+                        <div class="text-sm text-slate-500 dark:text-slate-400">${escapeHtml(card.russian)}</div>
+                    </div>
+                    <div class="flex items-center gap-x-2">
+                        <button onclick="event.stopImmediatePropagation(); uploadImageForCard('${card.id}')" 
+                                class="text-slate-400 hover:text-teal-600 touch-target"><i class="fa-solid fa-camera"></i></button>
+                        <button class="text-slate-400 hover:text-slate-600 touch-target px-2" 
+                                onclick="event.stopImmediatePropagation(); editCard('${card.id}')">
+                            <i class="fa-solid fa-ellipsis-vertical"></i>
+                        </button>
+                    </div>
+                `;
+
+                // Long-press для входа в режим выделения (pointer events)
+                let pressTimer = null;
+                const startPress = () => {
+                    pressTimer = setTimeout(() => {
+                        if (navigator.vibrate) navigator.vibrate(20);
+                        enterSelectionMode(card.id);
+                    }, CONSTANTS.LONG_PRESS_DURATION_MS);
+                };
+                const cancelPress = () => clearTimeout(pressTimer);
+                row.addEventListener('pointerdown', startPress);
+                row.addEventListener('pointerup', cancelPress);
+                row.addEventListener('pointercancel', cancelPress);
+                row.addEventListener('pointermove', (e) => {
+                    if (e.pointerType === 'touch' && pressTimer) {
+                        clearTimeout(pressTimer);
+                        pressTimer = null;
+                    }
+                });
+                row.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    enterSelectionMode(card.id);
+                });
+            }
+            return row;
+        }
+
+        // ==================== МУЛЬТИВЫБОР КАРТОЧЕК (ВАРИАНТ Б) ====================
+        function enterSelectionMode(initialCardId = null) {
+            if (selectionMode) return;
+            selectionMode = true;
+            selectedCardIds.clear();
+            if (initialCardId) selectedCardIds.add(initialCardId);
+            showFolderCards(currentFolderId);
+        }
+
+        // Сбрасывает режим мультивыбора. Вызывается как при явной отмене внутри
+        // колоды, так и при любом уходе с экрана карточек (назад, другие вкладки),
+        // чтобы состояние выбора не "утекало" между экранами.
+        function resetSelectionState() {
+            selectionMode = false;
+            selectedCardIds.clear();
+        }
+
+        function exitSelectionMode() {
+            resetSelectionState();
+            showFolderCards(currentFolderId);
+        }
+
+        function toggleCardSelection(cardId) {
+            if (selectedCardIds.has(cardId)) {
+                selectedCardIds.delete(cardId);
+            } else {
+                selectedCardIds.add(cardId);
+            }
+            showFolderCards(currentFolderId);
+        }
+
+        // Модалка выбора папки (через замыкание)
+        function showFolderPickerModal(excludeFolderId) {
+            return new Promise((resolve) => {
+                const availableFolders = folders.filter(f => f.id !== excludeFolderId && !f.system);
+                if (availableFolders.length === 0) {
+                    showAlertModal('Нет колод', 'Нет доступных колод для перемещения.');
+                    resolve(null);
+                    return;
+                }
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[150]';
+                modal.onclick = () => { modal.remove(); resolve(null); };
+                const onPick = (folderId) => {
+                    modal.remove();
+                    resolve(folderId);
+                };
+                let html = `
+                    <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[420px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
+                        <div class="font-semibold text-xl mb-4">Выберите колоду</div>
+                        <div class="space-y-2 max-h-[300px] overflow-y-auto">
+                `;
+                availableFolders.forEach(f => {
+                    html += `
+                        <button class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex justify-between items-center text-base touch-target">
+                            <span>${escapeHtml(f.name)}</span>
+                            <span class="text-xs text-slate-400">${f.cards.length} слов</span>
+                        </button>
+                    `;
+                });
+                html += `
+                        </div>
+                        <button class="btn-cancel-block">Отмена</button>
+                    </div>
+                `;
+                modal.innerHTML = html;
+                document.body.appendChild(modal);
+                const buttons = modal.querySelectorAll('button');
+                buttons.forEach((btn, index) => {
+                    if (index < availableFolders.length) {
+                        btn.onclick = () => onPick(availableFolders[index].id);
+                    } else {
+                        btn.onclick = () => onPick(null);
+                    }
+                });
+            });
+        }
+
+        // Массовые операции
+        async function bulkMoveSelectedCards() {
+            const ids = Array.from(selectedCardIds);
+            if (ids.length === 0) return;
+            const currentFolder = getCurrentFolder();
+            const targetFolderId = await showFolderPickerModal(currentFolder.id);
+            if (!targetFolderId) return;
+            const targetFolder = folders.find(f => f.id === targetFolderId);
+            if (!targetFolder || targetFolder.id === currentFolder.id) return;
+            const ok = await showConfirmModal('Переместить карточки', `Переместить ${ids.length} карточек в «${targetFolder.name}»?`, { confirmLabel: 'Переместить', danger: false });
+            if (!ok) return;
+            for (const id of ids) {
+                const { card, folder: sourceFolder } = findCardAndFolderById(id);
+                if (!card || !sourceFolder || sourceFolder.id === targetFolderId) continue;
+                sourceFolder.cards = sourceFolder.cards.filter(c => c.id !== id);
+                targetFolder.cards.push(card);
+            }
+            await saveData();
+            dueCards = dueCards.filter(c => !ids.includes(c.id));
+            await showAlertModal('Готово', `Перемещено ${ids.length} карточек.`);
+            exitSelectionMode();
+        }
+
+        async function bulkMoveSelectedToMastered() {
+            const ids = Array.from(selectedCardIds);
+            if (ids.length === 0) return;
+            const ok = await showConfirmModal('В архив', `Отправить ${ids.length} карточек в архив?`, { confirmLabel: 'Переместить', danger: false });
+            if (!ok) return;
+            await moveSelectedCardsToMastered(ids);
+            await showAlertModal('Готово', `Перемещено ${ids.length} карточек в архив.`);
+            exitSelectionMode();
+        }
+
+        async function bulkDeleteSelectedCards() {
+            const ids = Array.from(selectedCardIds);
+            if (ids.length === 0) return;
+            const ok = await showConfirmModal('Удалить карточки', `Удалить ${ids.length} карточек? Это действие необратимо.`, { danger: true });
+            if (!ok) return;
+            const folder = getCurrentFolder();
+            for (const id of ids) {
+                const card = folder.cards.find(c => c.id === id);
+                if (!card) continue;
+                if (card._imageObjectUrl) URL.revokeObjectURL(card._imageObjectUrl);
+                if (card.imageId) await MediaStore.deleteImage(card.imageId);
+            }
+            folder.cards = folder.cards.filter(c => !ids.includes(c.id));
+            await saveData();
+            dueCards = dueCards.filter(c => !ids.includes(c.id));
+            await showAlertModal('Готово', `Удалено ${ids.length} карточек.`);
+            exitSelectionMode();
+        }
+
+        // ==================== showFolderCards (переписана с мультивыбором) ====================
         async function showFolderCards(folderId) {
             currentFolderId = folderId;
             const folder = getCurrentFolder();
             document.getElementById('current-folder-name').textContent = folder.name;
+
             const container = document.getElementById('main-content');
             container.innerHTML = `
                 <div class="scrollable-content px-1 pt-2">
                     <div class="flex justify-between items-center mb-3">
                         <button onclick="showFoldersView()" class="text-sm text-teal-600 flex items-center gap-x-1 touch-target"><i class="fa-solid fa-arrow-left"></i> <span>Назад</span></button>
-                        <button onclick="showAddCardModal()" class="px-4 py-2 bg-teal-600 text-white rounded-2xl text-sm flex items-center gap-x-2 touch-target"><i class="fa-solid fa-plus"></i> <span>Добавить</span></button>
+                        <div class="flex items-center gap-x-2">
+                            ${!selectionMode ? `
+                                <button onclick="enterSelectionMode()" class="text-sm px-3 py-1 rounded-xl bg-slate-200 dark:bg-slate-700 touch-target">Выбрать</button>
+                                <button onclick="showAddCardModal()" class="px-4 py-2 bg-teal-600 text-white rounded-2xl text-sm flex items-center gap-x-2 touch-target"><i class="fa-solid fa-plus"></i> <span>Добавить</span></button>
+                            ` : ''}
+                        </div>
                     </div>
                     ${folder.hidden ? `
                     <div class="mb-3 p-3 rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 flex items-center justify-between gap-x-2">
@@ -1781,87 +2216,169 @@
                 </div>
             `;
 
-            if (folder.cards.length > 0) {
-                const listContainer = document.getElementById('card-list');
-                folder.cards.forEach(card => {
-                    const row = createCardListRow(card);
-                    listContainer.appendChild(row);
+            if (folder.cards.length === 0) return;
+
+            const listContainer = document.getElementById('card-list');
+            folder.cards.forEach(card => {
+                listContainer.appendChild(renderCardRow(card));
+            });
+
+            // Управление панелью действий
+            const oldBar = document.getElementById('selection-action-bar');
+            if (oldBar) oldBar.remove();
+
+            if (selectionMode) {
+                const actionBar = document.createElement('div');
+                actionBar.id = 'selection-action-bar';
+                actionBar.className = 'fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 px-4 py-3 z-50 flex items-center justify-between gap-2';
+                actionBar.style.paddingBottom = 'calc(env(safe-area-inset-bottom, 0px) + 12px)';
+                actionBar.innerHTML = `
+                    <div class="flex items-center gap-x-3 min-w-0">
+                        <span class="font-medium text-sm whitespace-nowrap">Выбрано: ${selectedCardIds.size}</span>
+                        <button onclick="exitSelectionMode()" class="text-sm px-3 py-1 rounded-xl bg-slate-200 dark:bg-slate-700 touch-target whitespace-nowrap">Отмена</button>
+                    </div>
+                    <button onclick="showSelectionActionsMenu()" class="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-xl bg-slate-200 dark:bg-slate-700 touch-target" ${selectedCardIds.size === 0 ? 'disabled style="opacity:0.5"' : ''}>
+                        <i class="fa-solid fa-ellipsis-vertical text-lg"></i>
+                    </button>
+                `;
+                document.getElementById('main-content').appendChild(actionBar);
+                const scrollable = document.querySelector('.scrollable-content');
+                if (scrollable) scrollable.style.paddingBottom = '90px';
+            } else {
+                const scrollable = document.querySelector('.scrollable-content');
+                if (scrollable) scrollable.style.paddingBottom = '';
+            }
+        }
+
+        // Bottom sheet с операциями над выделенными карточками — вызывается
+        // из компактной кнопки «⋮» в панели действий (вместо ряда кнопок,
+        // который переполнялся на узких экранах).
+        function showSelectionActionsMenu() {
+            if (selectedCardIds.size === 0) return;
+            const folder = getCurrentFolder();
+            const allSelected = folder.cards.length > 0 && folder.cards.every(c => selectedCardIds.has(c.id));
+
+            const overlay = document.createElement('div');
+            overlay.className = 'context-menu-overlay';
+            overlay.onclick = function (e) { if (e.target === this) this.remove(); };
+            const menu = document.createElement('div');
+            menu.className = 'context-menu';
+            menu.onclick = (e) => e.stopPropagation();
+            menu.innerHTML = `
+                <button class="context-menu-item" data-action="toggle-all">
+                    <i class="fa-solid ${allSelected ? 'fa-square-minus' : 'fa-check-double'}"></i>
+                    ${allSelected ? 'Снять выделение' : 'Выбрать все в колоде'}
+                </button>
+                <div class="context-menu-divider"></div>
+                <button class="context-menu-item" data-action="move"><i class="fa-solid fa-arrow-right-arrow-left"></i> Переместить в колоду</button>
+                ${folder.system ? '' : `<button class="context-menu-item" data-action="archive"><i class="fa-solid fa-box-archive"></i> В архив</button>`}
+                <div class="context-menu-divider"></div>
+                <button class="context-menu-item danger" data-action="delete"><i class="fa-solid fa-trash"></i> Удалить</button>
+            `;
+            overlay.appendChild(menu);
+            document.body.appendChild(overlay);
+
+            menu.querySelector('[data-action="toggle-all"]').addEventListener('click', () => {
+                overlay.remove();
+                if (allSelected) {
+                    selectedCardIds.clear();
+                } else {
+                    folder.cards.forEach(c => selectedCardIds.add(c.id));
+                }
+                showFolderCards(currentFolderId);
+            });
+            menu.querySelector('[data-action="move"]').addEventListener('click', () => {
+                overlay.remove();
+                bulkMoveSelectedCards();
+            });
+            const archiveBtn = menu.querySelector('[data-action="archive"]');
+            if (archiveBtn) {
+                archiveBtn.addEventListener('click', () => {
+                    overlay.remove();
+                    bulkMoveSelectedToMastered();
                 });
             }
+            menu.querySelector('[data-action="delete"]').addEventListener('click', () => {
+                overlay.remove();
+                bulkDeleteSelectedCards();
+            });
         }
 
         // ==================== ИЗУЧЕНИЕ ====================
-        function startStudyWithFolder(folderId) {
+        async function startStudyWithFolder(folderId) {
             const folder = folders.find(f => f.id === folderId);
-            if (!folder || folder.hidden) {
-                alert('Эта колода скрыта.');
+            if (!folder) return;
+            if (folder.hidden) {
+                const ok = await showConfirmModal('Колода скрыта', `Колода «${folder.name}» скрыта из общего обучения. Показать её и начать обучение?`, { confirmLabel: 'Показать и учить', danger: false });
+                if (ok) await unhideAndStudy(folderId);
                 return;
             }
-
+            resetSelectionState();
             const cards = folder.cards || [];
-            dueCards = getDueCardsFromArray(cards);
-
-            if (dailyLimitEnabled && dueCards.length > dailyLimitCount) {
-                dueCards = dueCards.slice(0, dailyLimitCount);
-            }
-
+            dueCards = applyDailyLimit(getDueCardsFromArray(cards));
             initialDueCount = dueCards.length;
-
             if (dueCards.length === 0) {
-                showEmptyStudyState(folder.name);
+                showEmptyStudyState(folder.name, cards);
                 return;
             }
-
             currentCardIndex = 0;
             lastReviewedCard = null;
+            undoStack = [];
             sessionStableCandidates = [];
             document.getElementById('current-folder-name').textContent = 'Обучение';
             showCurrentCard();
+        }
+
+        // Выход из сессии обучения до её завершения. Все уже оценённые карточки
+        // на этот момент уже сохранены (saveData вызывается после каждой оценки),
+        // поэтому подтверждение не нужно — теряется только очередь оставшихся карточек,
+        // а они всё равно останутся due и будут показаны в следующий раз.
+        function exitStudySession() {
+            dueCards = [];
+            currentCardIndex = 0;
+            undoStack = [];
+            lastReviewedCard = null;
+            showFoldersView();
         }
 
         async function startStudy() {
+            resetSelectionState();
             document.getElementById('current-folder-name').textContent = 'Обучение';
-
             const visibleFolders = folders.filter(f => !f.hidden && !f.system);
-            const cards = visibleFolders.flatMap(f => f.cards || []);
-
-            const cardsWithFolder = cards.map(c => {
-                const parent = visibleFolders.find(f => f.cards && f.cards.some(card => card.id === c.id));
-                return { ...c, folderName: parent ? parent.name : '' };
+            const allCards = [];
+            visibleFolders.forEach(folder => {
+                folder.cards.forEach(card => {
+                    card.folderId = folder.id;
+                    card.folderName = folder.name;
+                    allCards.push(card);
+                });
             });
-
-            dueCards = getDueCardsFromArray(cardsWithFolder);
-
-            if (dailyLimitEnabled && dueCards.length > dailyLimitCount) {
-                dueCards = dueCards.slice(0, dailyLimitCount);
-            }
-
+            dueCards = applyDailyLimit(getDueCardsFromArray(allCards));
             initialDueCount = dueCards.length;
-
             if (dueCards.length === 0) {
-                showEmptyStudyState('Все колоды');
+                showEmptyStudyState('Все колоды', allCards);
                 return;
             }
-
             currentCardIndex = 0;
             lastReviewedCard = null;
+            undoStack = [];
             sessionStableCandidates = [];
             showCurrentCard();
         }
 
-        function showEmptyStudyState(sourceName) {
+        function showEmptyStudyState(sourceName, cardsInScope) {
             const container = document.getElementById('main-content');
             if (!container) return;
-
+            const nextReview = cardsInScope ? getTimeUntilNextReview(cardsInScope) : null;
             container.innerHTML = `
                 <div class="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
                     <i class="fa-solid fa-check-circle text-7xl text-teal-500 mb-6"></i>
-                    <div class="text-2xl font-semibold mb-3">Всё повторено!</div>
+                    <div class="text-2xl font-semibold mb-3">Отлично!</div>
                     <div class="text-slate-500 dark:text-slate-400 max-w-xs mb-8">
                         В «${escapeHtml(sourceName)}» нет карточек для повторения на сегодня.
+                        ${nextReview ? `<br>Следующее повторение — ${nextReview.text}.` : ''}
                     </div>
-                    <button onclick="showFoldersView()" 
-                            class="px-8 py-3.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white rounded-2xl font-medium text-base touch-target transition">
+                    <button onclick="showFoldersView()" class="px-8 py-3.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white rounded-2xl font-medium text-base touch-target transition">
                         Вернуться к колодам
                     </button>
                 </div>
@@ -1869,52 +2386,39 @@
         }
 
         function showCurrentCard() {
-            // Освобождаем Object URL предыдущей карточки
             if (currentCardIndex > 0 && dueCards[currentCardIndex - 1]?._imageObjectUrl) {
                 URL.revokeObjectURL(dueCards[currentCardIndex - 1]._imageObjectUrl);
                 dueCards[currentCardIndex - 1]._imageObjectUrl = null;
             }
-
-            const undoBtn = document.getElementById('undo-review-btn');
-
             if (currentCardIndex >= dueCards.length) {
                 const container = document.getElementById('main-content');
                 container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="text-center py-6">
-                            <i class="fa-solid fa-check-circle text-5xl text-emerald-500 mb-3"></i>
-                            <p class="text-xl font-semibold">Отлично! Все карточки повторены.</p>
-                            <button onclick="showFoldersView()" class="mt-4 px-6 py-3 bg-teal-600 text-white rounded-2xl font-medium text-base touch-target">Вернуться к колодам</button>
+                    <div class="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
+                        <i class="fa-solid fa-check-circle text-7xl text-emerald-500 mb-6"></i>
+                        <div class="text-2xl font-semibold mb-3">Отлично!</div>
+                        <div class="text-slate-500 dark:text-slate-400 max-w-xs mb-8">
+                            Все карточки на сегодня повторены.
                         </div>
+                        <button onclick="showFoldersView()" class="px-8 py-3.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white rounded-2xl font-medium text-base touch-target transition">
+                            Вернуться к колодам
+                        </button>
                     </div>
                 `;
-                if (undoBtn && lastReviewedCard) {
-                    undoBtn.style.display = 'flex';
-                    undoBtn.classList.add('visible');
-                } else if (undoBtn) {
-                    undoBtn.classList.remove('visible');
-                    undoBtn.style.display = 'none';
-                }
-
+                updateUndoButton();
                 if (sessionStableCandidates.length > 0) {
-                    setTimeout(() => {
-                        showEndOfSessionStableReview();
-                    }, 600);
+                    setTimeout(() => showEndOfSessionStableReview(), 600);
                 }
                 return;
             }
 
             const card = dueCards[currentCardIndex];
-
+            const intervalPreview = [1, 2, 3, 4].map(g => formatIntervalPreview(previewNextDelay(card, g)));
             let progressHtml = '';
             if (initialDueCount) {
                 const done = currentCardIndex;
                 const total = initialDueCount;
                 const percent = Math.round((done / total) * 100);
-                let limitText = '';
-                if (dailyLimitEnabled) {
-                    limitText = ` (лимит: ${dailyLimitCount})`;
-                }
+                let limitText = dailyLimitEnabled ? ` (лимит новых: ${dailyLimitCount})` : '';
                 progressHtml = `
                     <div class="progress-area px-1 mb-1">
                         <div class="flex justify-between items-center mb-1">
@@ -1930,9 +2434,7 @@
             if (card.imageId || (card.image && card.image.startsWith('data:image'))) {
                 imageHtml = `
                     <div class="image-area relative" id="study-image-container">
-                        <img id="study-card-image" 
-                             onclick="uploadImageForCurrentCard(event)" 
-                             class="w-full max-h-36 object-contain rounded-2xl cursor-pointer">
+                        <img id="study-card-image" onclick="uploadImageForCurrentCard(event)" class="w-full max-h-36 object-contain rounded-2xl cursor-pointer">
                     </div>`;
             } else {
                 imageHtml = `<div id="study-image-container" onclick="uploadImageForCurrentCard(event)" class="image-placeholder">
@@ -1953,11 +2455,15 @@
             const container = document.getElementById('main-content');
             container.innerHTML = `
                 <div class="study-container">
+                    <div class="flex items-center mb-1">
+                        <button onclick="exitStudySession()" class="text-sm text-teal-600 dark:text-teal-400 flex items-center gap-x-1 touch-target -ml-2 px-2">
+                            <i class="fa-solid fa-arrow-left"></i> <span>Назад</span>
+                        </button>
+                    </div>
                     ${progressHtml}
                     <div class="study-card-wrapper">
                         <div class="study-card card-enter" onclick="flipStudyCard()">
-                            <button onclick="editCurrentStudyCard(event)"
-                                    class="absolute top-3 right-3 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 touch-target">
+                            <button onclick="editCurrentStudyCard(event)" class="absolute top-3 right-3 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 touch-target">
                                 <i class="fa-solid fa-ellipsis-vertical text-xl"></i>
                             </button>
                             ${imageHtml}
@@ -1971,13 +2477,16 @@
                                 <i class="fa-solid fa-volume-up"></i>
                             </button>
                             ${folderLabelHTML}
+                            <button id="undo-review-btn" onclick="event.stopImmediatePropagation(); undoLastReview()" title="Отменить последнюю оценку">
+                                <i class="fa-solid fa-rotate-left"></i> <span>Отменить</span>
+                            </button>
                         </div>
                     </div>
                     <div class="rating-buttons">
-                        <button onclick="rateCard(1)" class="rating-btn bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400">Снова<br><span class="text-xs opacity-70">Забыл</span></button>
-                        <button onclick="rateCard(2)" class="rating-btn bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400">Трудно<br><span class="text-xs opacity-70">С усилием</span></button>
-                        <button onclick="rateCard(3)" class="rating-btn bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400">Хорошо<br><span class="text-xs opacity-70">Нормально</span></button>
-                        <button onclick="rateCard(4)" class="rating-btn bg-teal-600 text-white">Легко<br><span class="text-xs opacity-80">Сразу вспомнил</span></button>
+                        <button onclick="rateCard(1)" class="rating-btn bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800">Снова<br><span class="text-xs opacity-75">${intervalPreview[0]}</span></button>
+                        <button onclick="rateCard(2)" class="rating-btn bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">Трудно<br><span class="text-xs opacity-75">${intervalPreview[1]}</span></button>
+                        <button onclick="rateCard(3)" class="rating-btn bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800">Хорошо<br><span class="text-xs opacity-75">${intervalPreview[2]}</span></button>
+                        <button onclick="rateCard(4)" class="rating-btn bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-400 border border-teal-300 dark:border-teal-800">Легко<br><span class="text-xs opacity-75">${intervalPreview[3]}</span></button>
                     </div>
                 </div>
             `;
@@ -1988,11 +2497,9 @@
             if (imgContainer) {
                 let pressTimer = null;
                 const startPress = (e) => {
-                    pressTimer = setTimeout(() => {
-                        showImageActionMenu(card);
-                    }, 550);
+                    pressTimer = setTimeout(() => showImageActionMenu(card), 550);
                 };
-                const cancelPress = () => { clearTimeout(pressTimer); };
+                const cancelPress = () => clearTimeout(pressTimer);
                 imgContainer.addEventListener('touchstart', startPress, { passive: true });
                 imgContainer.addEventListener('touchend', cancelPress);
                 imgContainer.addEventListener('touchmove', cancelPress);
@@ -2025,11 +2532,7 @@
                 }
             }
 
-            if (undoBtn) {
-                undoBtn.style.display = lastReviewedCard ? 'flex' : 'none';
-                if (lastReviewedCard) undoBtn.classList.add('visible');
-                else undoBtn.classList.remove('visible');
-            }
+            updateUndoButton();
         }
 
         // --- Меню действий с изображением (long-press) ---
@@ -2037,20 +2540,15 @@
             const overlay = document.createElement('div');
             overlay.className = 'fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[200]';
             overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-
             overlay.innerHTML = `
                 <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[320px] rounded-t-3xl sm:rounded-3xl p-2">
                     <div class="py-2 px-4 text-sm text-slate-500 dark:text-slate-400">Действия с фото</div>
-                    <button onclick="changeCardImage('${card.id}'); this.closest('.fixed').remove();" 
-                            class="menu-item">
-                        <i class="fa-solid fa-edit w-5 text-teal-600"></i> 
-                        <span>${card.imageId ? 'Изменить фото' : 'Добавить фото'}</span>
+                    <button onclick="changeCardImage('${card.id}'); this.closest('.fixed').remove();" class="menu-item">
+                        <i class="fa-solid fa-edit w-5 text-teal-600"></i> <span>${card.imageId ? 'Изменить фото' : 'Добавить фото'}</span>
                     </button>
                     ${card.imageId ? `
-                    <button onclick="removeCardImage('${card.id}'); this.closest('.fixed').remove();" 
-                            class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target text-red-600">
-                        <i class="fa-solid fa-trash w-5"></i> 
-                        <span>Удалить фото</span>
+                    <button onclick="removeCardImage('${card.id}'); this.closest('.fixed').remove();" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target text-red-600">
+                        <i class="fa-solid fa-trash w-5"></i> <span>Удалить фото</span>
                     </button>` : ''}
                     <button onclick="this.closest('.fixed').remove()" class="mt-2 w-full py-3 text-sm text-slate-500 dark:text-slate-400 touch-target">Отмена</button>
                 </div>
@@ -2076,7 +2574,8 @@
         }
 
         async function removeCardImage(cardId) {
-            if (!confirm('Удалить фото?')) return;
+            const ok = await showConfirmModal('Удалить фото', 'Удалить фото у этой карточки?', { confirmLabel: 'Удалить' });
+            if (!ok) return;
             const folder = getCurrentFolder();
             const card = folder.cards.find(c => c.id === cardId);
             if (!card) return;
@@ -2107,7 +2606,6 @@
             const card = folder.cards.find(c => c.id === cardId);
             if (!card) return;
             viewingCardId = cardId;
-
             const content = document.getElementById('card-view-content');
             content.innerHTML = `
                 <div class="study-card" style="cursor:default; min-height:200px;">
@@ -2128,10 +2626,8 @@
                         : ''}
                 </div>
             `;
-
             document.getElementById('cardViewModal').classList.remove('hidden');
             document.getElementById('cardViewModal').classList.add('flex');
-
             if (card.imageId || (card.image && card.image.startsWith('data:image'))) {
                 (async () => {
                     const src = await getCardImageSrc(card);
@@ -2163,7 +2659,8 @@
         }
 
         async function resetFromViewModal() {
-            if (!confirm('Сбросить прогресс этой карточки?')) return;
+            const ok = await showConfirmModal('Сбросить прогресс', 'Сбросить прогресс этой карточки?', { confirmLabel: 'Сбросить' });
+            if (!ok) return;
             const folder = getCurrentFolder();
             const card = folder.cards.find(c => c.id === viewingCardId);
             if (card) {
@@ -2193,33 +2690,32 @@
         function fitStudyCardContent() {
             const cardEl = document.querySelector('.study-card');
             if (!cardEl) return;
-
             const isSmallScreen = window.innerWidth <= 480;
             const baseEnglish = isSmallScreen ? 2 : 2.5;
             const baseRussian = isSmallScreen ? 1.6 : 2;
             const baseImgHeight = 140;
             const minEnglish = 1.15, minRussian = 1.05, minImgHeight = 60;
-
             let scale = 1;
+            cardEl.style.overflowY = 'hidden';
             cardEl.style.setProperty('--word-font-english', baseEnglish + 'rem');
             cardEl.style.setProperty('--word-font-russian', baseRussian + 'rem');
             cardEl.style.setProperty('--img-max-height', baseImgHeight + 'px');
-
             for (let step = 0; step < 18; step++) {
                 if (cardEl.scrollHeight <= cardEl.clientHeight + 1) break;
-
                 scale -= 0.06;
-                if (scale <= 0.35) break;
-
+                if (scale <= CONSTANTS.MIN_STUDY_FONT_SCALE) break;
                 const eng = Math.max(minEnglish, baseEnglish * scale);
                 const rus = Math.max(minRussian, baseRussian * scale);
                 cardEl.style.setProperty('--word-font-english', eng + 'rem');
                 cardEl.style.setProperty('--word-font-russian', rus + 'rem');
-
                 if (step >= 3) {
                     const imgH = Math.max(minImgHeight, baseImgHeight * scale);
                     cardEl.style.setProperty('--img-max-height', imgH + 'px');
                 }
+            }
+            if (cardEl.scrollHeight > cardEl.clientHeight + 1) {
+                cardEl.style.overflowY = 'auto';
+                cardEl.style.webkitOverflowScrolling = 'touch';
             }
         }
 
@@ -2228,22 +2724,27 @@
         }, 200));
 
         let isRatingCard = false;
+
         async function rateCard(grade) {
             if (isRatingCard) return;
             const card = dueCards[currentCardIndex];
             if (!card) return;
+            // Haptic feedback
+            if (navigator.vibrate) navigator.vibrate(20);
             isRatingCard = true;
             try {
-
-                lastReviewedCard = {
+                const snapshot = {
                     card: JSON.parse(JSON.stringify(card)),
                     index: currentCardIndex,
                     statsSnapshot: JSON.parse(JSON.stringify(stats)),
-                    dueCardsSnapshot: JSON.parse(JSON.stringify(dueCards)),
+                    dueCardsIdsSnapshot: dueCards.map(c => c.id),
                     initialDueCountSnapshot: initialDueCount
                 };
-
-                if (navigator.vibrate) navigator.vibrate(10);
+                undoStack.push(snapshot);
+                if (undoStack.length > CONSTANTS.MAX_UNDO_STEPS) {
+                    undoStack.shift();
+                }
+                lastReviewedCard = snapshot;
 
                 await updateCardAfterReview(card, grade);
                 await recordStudyActivity();
@@ -2274,36 +2775,47 @@
                 currentCardIndex++;
                 showCurrentCard();
                 await checkAchievements();
-
-                const undoBtn = document.getElementById('undo-review-btn');
-                if (undoBtn) {
-                    undoBtn.classList.add('visible');
-                    undoBtn.style.display = 'flex';
-                }
+                updateUndoButton();
             } finally {
                 isRatingCard = false;
             }
         }
 
-        async function undoLastReview() {
-            if (!lastReviewedCard) return;
-            if (navigator.vibrate) navigator.vibrate(10);
-
-            const { card: savedCard, index, statsSnapshot, dueCardsSnapshot, initialDueCountSnapshot } = lastReviewedCard;
-            const folder = getCurrentFolder();
-            let realCard = folder.cards.find(c => c.id === savedCard.id);
-
-            if (!realCard) {
-                const masteredFolder = getMasteredFolder();
-                realCard = masteredFolder.cards.find(c => c.id === savedCard.id);
-                if (realCard) {
-                    masteredFolder.cards = masteredFolder.cards.filter(c => c.id !== savedCard.id);
-                    folder.cards.push(realCard);
-                }
+        function updateUndoButton() {
+            const undoBtn = document.getElementById('undo-review-btn');
+            if (!undoBtn) return;
+            if (undoStack.length > 0) {
+                undoBtn.classList.add('visible');
+            } else {
+                undoBtn.classList.remove('visible');
             }
+        }
 
-            if (realCard) {
+        async function undoLastReview() {
+            if (undoStack.length === 0) return;
+            if (navigator.vibrate) navigator.vibrate(10);
+            const { card: savedCard, index, statsSnapshot, dueCardsIdsSnapshot, initialDueCountSnapshot } = undoStack.pop();
+            lastReviewedCard = undoStack.length > 0 ? undoStack[undoStack.length - 1] : null;
+
+            const { card: realCard, folder } = findCardAndFolderById(savedCard.id);
+
+            // Отменённая оценка могла добавить карточку в кандидаты на архив
+            // (см. rateCard) — раз оценка отменена, доверять этому кандидату
+            // больше нельзя: если карточка снова наберёт стабильность, rateCard
+            // добавит её заново при следующей успешной оценке в этой сессии.
+            sessionStableCandidates = sessionStableCandidates.filter(c => c.id !== savedCard.id);
+
+            if (realCard && folder) {
                 Object.assign(realCard, savedCard);
+            } else {
+                const mastered = getMasteredFolder();
+                const masteredCard = mastered.cards.find(c => c.id === savedCard.id);
+                if (masteredCard) {
+                    mastered.cards = mastered.cards.filter(c => c.id !== savedCard.id);
+                    const targetFolder = folders.find(f => f.id === savedCard.folderId) || getCurrentFolder();
+                    Object.assign(masteredCard, savedCard);
+                    targetFolder.cards.push(masteredCard);
+                }
             }
 
             if (statsSnapshot) {
@@ -2311,22 +2823,20 @@
                 await saveStats();
             }
 
-            if (dueCardsSnapshot) {
-                dueCards = dueCardsSnapshot;
+            if (dueCardsIdsSnapshot) {
+                // Восстанавливаем очередь через ЖИВЫЕ ссылки на folders, а не через
+                // клоны — иначе следующая оценка в этой сессии мутировала бы
+                // отсоединённую копию, и saveData() тихо не сохранил бы её.
+                dueCards = dueCardsIdsSnapshot
+                    .map(id => findCardAndFolderById(id).card)
+                    .filter(Boolean);
             }
             if (initialDueCountSnapshot !== undefined) {
                 initialDueCount = initialDueCountSnapshot;
             }
 
-            currentCardIndex = index;
-            lastReviewedCard = null;
-
-            const undoBtn = document.getElementById('undo-review-btn');
-            if (undoBtn) {
-                undoBtn.classList.remove('visible');
-                undoBtn.style.display = 'none';
-            }
-
+            currentCardIndex = dueCards.length === 0 ? 0 : Math.min(index, dueCards.length - 1);
+            updateUndoButton();
             showCurrentCard();
             await saveData();
         }
@@ -2335,6 +2845,10 @@
             if (event) event.stopImmediatePropagation();
             const card = dueCards[currentCardIndex];
             if (!card) return;
+            // currentFolderId может указывать не на ту папку (например, при общем
+            // обучении по всем колодам) — находим настоящую папку карточки явно.
+            const { folder } = findCardAndFolderById(card.id);
+            if (folder) currentFolderId = folder.id;
             editCard(card.id, 'study');
         }
 
@@ -2366,7 +2880,6 @@
             if (!card) return;
             editingCardId = cardId;
             editContext = context;
-
             document.getElementById('edit-english').value = card.english;
             document.getElementById('edit-russian').value = card.russian;
             document.getElementById('edit-stability').value = card.stability !== undefined ? card.stability.toFixed(2) : '';
@@ -2377,7 +2890,6 @@
 
             const actionBtn = document.getElementById('mastered-action-btn');
             const isInMastered = folder.system === true;
-
             if (isInMastered) {
                 actionBtn.innerHTML = `<i class="fa-solid fa-undo"></i> <span>Вернуть в колоду...</span>`;
                 actionBtn.className = "mt-3 w-full py-3 rounded-xl border border-amber-200 text-amber-600 flex items-center justify-center gap-x-2 text-sm touch-target";
@@ -2388,7 +2900,6 @@
                 actionBtn.onclick = moveEditingCardToMastered;
             }
             actionBtn.style.display = 'flex';
-
             document.getElementById('editModal').classList.remove('hidden');
             document.getElementById('editModal').classList.add('flex');
         }
@@ -2402,32 +2913,23 @@
             const folder = getCurrentFolder();
             const card = folder.cards.find(c => c.id === editingCardId);
             if (!card) return;
-
             card.english = document.getElementById('edit-english').value.trim();
             card.russian = document.getElementById('edit-russian').value.trim();
-
             const stabilityVal = document.getElementById('edit-stability').value.trim();
             const difficultyVal = document.getElementById('edit-difficulty').value.trim();
-
             const newStability = stabilityVal !== '' ? parseFloat(stabilityVal) : undefined;
             const newDifficulty = difficultyVal !== '' ? parseFloat(difficultyVal) : undefined;
-
             const stabilityChanged = newStability !== card.stability;
             const difficultyChanged = newDifficulty !== card.difficulty;
-
             if ((stabilityVal !== '' && isNaN(newStability)) || (difficultyVal !== '' && isNaN(newDifficulty))) {
-                alert('Введены некорректные числовые значения. Будет использовано безопасное значение.');
+                await showAlertModal('Некорректное значение', 'Введены некорректные числовые значения. Будет использовано безопасное значение.');
             }
-
             if (stabilityChanged || difficultyChanged) {
-                if (!confirm('Вы меняете параметры FSRS (Стабильность/Сложность). Это может изменить расписание повторений. Продолжить?')) {
-                    return;
-                }
+                const ok = await showConfirmModal('Изменение параметров FSRS', 'Вы меняете параметры FSRS (Стабильность/Сложность). Это может изменить расписание повторений. Продолжить?', { confirmLabel: 'Продолжить', danger: false });
+                if (!ok) return;
             }
-
             card.stability = newStability !== undefined ? safeStability(newStability) : undefined;
             card.difficulty = newDifficulty !== undefined ? safeDifficulty(newDifficulty) : undefined;
-
             card.state = document.getElementById('edit-state').value;
             const dateVal = document.getElementById('edit-next-date').value;
             if (dateVal) card.nextReviewDate = new Date(dateVal).toISOString();
@@ -2436,27 +2938,23 @@
         }
 
         async function deleteCurrentCard() {
-            if (!confirm('Удалить эту карточку?')) return;
-
+            const ok = await showConfirmModal('Удалить карточку', 'Удалить эту карточку? Это действие необратимо.', { confirmLabel: 'Удалить' });
+            if (!ok) return;
             const folder = getCurrentFolder();
             const card = folder.cards.find(c => c.id === editingCardId);
-
             if (card) {
-                if (card._imageObjectUrl) {
-                    URL.revokeObjectURL(card._imageObjectUrl);
-                }
-                if (card.imageId) {
-                    await MediaStore.deleteImage(card.imageId);
-                }
+                if (card._imageObjectUrl) URL.revokeObjectURL(card._imageObjectUrl);
+                if (card.imageId) await MediaStore.deleteImage(card.imageId);
             }
-
             folder.cards = folder.cards.filter(c => c.id !== editingCardId);
+            sessionStableCandidates = sessionStableCandidates.filter(c => c.id !== editingCardId);
             await debouncedSaveData();
             closeEditModalAndReturn();
         }
 
         async function resetCardProgressFromModal() {
-            if (!confirm('Сбросить прогресс этой карточки?')) return;
+            const ok = await showConfirmModal('Сбросить прогресс', 'Сбросить прогресс этой карточки?', { confirmLabel: 'Сбросить' });
+            if (!ok) return;
             const folder = getCurrentFolder();
             const card = folder.cards.find(c => c.id === editingCardId);
             if (!card) return;
@@ -2465,7 +2963,7 @@
             closeEditModalAndReturn();
         }
 
-        // ==================== ИЗОБРАЖЕНИЯ ====================
+        // ==================== ИЗОБРАЖЕНИЯ (загрузка) ====================
         async function uploadImageForCard(cardId) {
             const input = document.createElement('input');
             input.type = 'file';
@@ -2498,7 +2996,7 @@
             input.click();
         }
 
-        // ==================== ДОБАВЛЕНИЕ / ИМПОРТ ====================
+        // ==================== ДОБАВЛЕНИЕ И ИМПОРТ ====================
         function showAddCardModal() {
             document.getElementById('new-english').value = '';
             document.getElementById('new-russian').value = '';
@@ -2515,11 +3013,8 @@
             const english = document.getElementById('new-english').value.trim();
             const russian = document.getElementById('new-russian').value.trim();
             const isReversible = document.getElementById('is-reversible')?.checked || false;
-
-            if (!english || !russian) return alert('Пожалуйста, заполните обе стороны карточки');
-
+            if (!english || !russian) return await showAlertModal('Ошибка', 'Пожалуйста, заполните обе стороны карточки');
             const folder = getCurrentFolder();
-
             const card = {
                 id: 'card_' + Date.now() + Math.random(),
                 english: english,
@@ -2529,7 +3024,6 @@
                 ...makeFreshCardProgress()
             };
             folder.cards.push(card);
-
             if (isReversible) {
                 const reverseCard = {
                     id: 'card_' + Date.now() + Math.random(),
@@ -2541,7 +3035,6 @@
                 };
                 folder.cards.push(reverseCard);
             }
-
             await saveData();
             hideAddCardModal();
             showFolderCards(currentFolderId);
@@ -2555,16 +3048,12 @@
             const lines = trimmed.split(/\r?\n/);
             let current = null;
             let lastHeader = null;
-
             for (let i = 0; i < lines.length; i++) {
                 const raw = lines[i];
                 const t = raw.trim();
-
                 if (!t && !current) continue;
-
-                const frontMatch = t.match(/^Front:\s*(.*)/i);
-                const backMatch = t.match(/^Back:\s*(.*)/i);
-
+                const frontMatch = t.match(/^\*{0,2}Front:\*{0,2}\s*(.*)/i);
+                const backMatch = t.match(/^\*{0,2}Back:\*{0,2}\s*(.*)/i);
                 if (frontMatch) {
                     if (current && current.front && current.back) {
                         cards.push({ english: current.front.trim(), russian: current.back.trim() });
@@ -2583,13 +3072,11 @@
                     }
                 }
             }
-
             if (current && current.front && current.back) {
                 cards.push({ english: current.front.trim(), russian: current.back.trim() });
             }
-
             if (cards.length === 0) {
-                const sepPattern = /[—–\-:→=>]\s*/;
+                const sepPattern = /\s-\s|[—–:→=>]\s*/;
                 for (const line of lines) {
                     const t = line.trim();
                     if (!t) continue;
@@ -2607,7 +3094,6 @@
                     }
                 }
             }
-
             if (cards.length === 0) {
                 const blocks = trimmed.split(/\n\s*\n/);
                 for (const block of blocks) {
@@ -2615,7 +3101,6 @@
                     if (bl.length >= 2) cards.push({ english: bl[0], russian: bl[1] });
                 }
             }
-
             return cards;
         }
 
@@ -2643,13 +3128,15 @@
             const text = document.getElementById('import-text').value.trim();
             const folderId = document.getElementById('import-folder-select').value;
             const folder = folders.find(f => f.id === folderId);
-            if (!text || !folder) return alert('Введите текст и выберите колоду');
-
+            if (!text || !folder) {
+                await showAlertModal('Ошибка', 'Введите текст и выберите колоду');
+                return;
+            }
             const newCards = parseImportText(text);
             if (newCards.length === 0) {
-                return alert('Не удалось распознать ни одной карточки. Проверьте формат.');
+                await showAlertModal('Ошибка', 'Не удалось распознать ни одной карточки. Проверьте формат.');
+                return;
             }
-
             const cardsToAdd = newCards.map(c => ({
                 id: 'card_' + Date.now() + Math.random(),
                 english: c.english,
@@ -2658,21 +3145,18 @@
                 imageId: null,
                 ...makeFreshCardProgress()
             }));
-
             const { duplicates, unique } = findDuplicates(cardsToAdd, folder.cards);
-
             if (duplicates.length > 0) {
-                alert(`Найдено ${duplicates.length} дублирующихся карточек. Они пропущены.`);
+                await showAlertModal('Информация', `Найдено ${duplicates.length} дублирующихся карточек. Они пропущены.`);
             }
             if (unique.length === 0) {
-                alert('Нет новых уникальных карточек для добавления.');
+                await showAlertModal('Информация', 'Нет новых уникальных карточек для добавления.');
                 return;
             }
-
             folder.cards.push(...unique);
             await saveData();
             document.getElementById('import-text').value = '';
-            alert(`Импортировано ${unique.length} слов (${duplicates.length} пропущено дублей)`);
+            await showAlertModal('Готово', `Импортировано ${unique.length} слов (${duplicates.length} пропущено дублей)`);
             showFolderCards(folderId);
             await checkAchievements();
         }
@@ -2681,7 +3165,6 @@
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]';
             modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-
             modal.innerHTML = `
                 <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[520px] rounded-t-3xl sm:rounded-3xl p-6">
                     <div class="font-semibold text-xl mb-4">Как быстро импортировать много слов</div>
@@ -2705,10 +3188,7 @@ Front: Beautiful
 Back: Красивый</pre>
                         <p>4. Скопируй результат и вставь в поле импорта.</p>
                     </div>
-                    <button onclick="this.closest('.fixed').remove()" 
-                            class="mt-6 w-full py-3 rounded-2xl bg-teal-600 text-white font-medium text-base touch-target">
-                        Понятно
-                    </button>
+                    <button onclick="this.closest('.fixed').remove()" class="mt-6 w-full py-3 rounded-2xl bg-teal-600 text-white font-medium text-base touch-target">Понятно</button>
                 </div>
             `;
             document.body.appendChild(modal);
@@ -2720,14 +3200,35 @@ Back: Красивый</pre>
         }
 
         // ==================== ЭКСПОРТ ====================
-        function exportAllData() {
-            if (folders.length === 0) return alert('Нет данных для экспорта');
-            alert(
-                '❗️ В экспорт попадают только текстовые данные (слова и переводы).\n\n' +
-                'Изображения и статистика не сохраняются. При переносе на другое устройство ' +
-                'изображения придётся добавить заново.'
-            );
-            const data = JSON.stringify(folders, null, 2);
+        async function exportAllData() {
+            if (folders.length === 0) return await showAlertModal('Нет данных', 'Нет данных для экспорта');
+
+            const exportFolders = JSON.parse(JSON.stringify(folders)); // копия — не трогаем живые данные
+            const cache = await MediaStore.init() ? await caches.open(MediaStore.cacheName) : null;
+
+            for (const folder of exportFolders) {
+                for (const card of folder.cards) {
+                    if (card.imageId && cache) {
+                        try {
+                            const response = await cache.match(`img/${card.imageId}`);
+                            if (response) {
+                                const blob = await response.blob();
+                                card.image = await new Promise((resolve, reject) => {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => resolve(reader.result);
+                                    reader.onerror = reject;
+                                    reader.readAsDataURL(blob);
+                                });
+                            }
+                        } catch (e) {
+                            console.warn('Не удалось упаковать фото в экспорт:', e);
+                        }
+                    }
+                    delete card.imageId; // критично: иначе на другом устройстве миграция base64→кэш не сработает
+                }
+            }
+
+            const data = JSON.stringify(exportFolders, null, 2);
             const a = document.createElement('a');
             a.href = URL.createObjectURL(new Blob([data], {type: 'application/json'}));
             a.download = `vocabulary_backup_${new Date().toISOString().slice(0,10)}.json`;
@@ -2747,60 +3248,67 @@ Back: Красивый</pre>
             }
         }
 
+        // Перегенерирует id папок и карточек у импортируемых данных перед слиянием
+        // с существующими — иначе при повторном импорте того же бэкапа возможны
+        // коллизии id с уже существующими папками/карточками.
+        function regenerateImportedIds(importedFolders) {
+            importedFolders.forEach((folder, i) => {
+                folder.id = 'folder_' + Date.now() + '_' + i + '_' + Math.random().toString(36).slice(2, 9);
+                (folder.cards || []).forEach(card => {
+                    card.id = 'card_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+                });
+            });
+        }
+
         async function importData(jsonString) {
             try {
                 if (!jsonString || typeof jsonString !== 'string') {
                     throw new Error('Файл пустой или не является текстовым');
                 }
-
                 const imported = JSON.parse(jsonString);
-
                 if (imported === null || imported === undefined) {
                     throw new Error('Файл пустой или повреждён');
                 }
-
                 if (!Array.isArray(imported)) {
                     throw new Error('Файл должен содержать массив колод');
                 }
-
                 if (imported.some(f => !f.id || !f.name || !Array.isArray(f.cards))) {
                     throw new Error('Неверный формат данных (отсутствуют обязательные поля)');
                 }
-
-                const shouldReplace = confirm(
-                    'Заменить все текущие данные?\n\n' +
-                    'OK — заменить все данные\n' +
-                    'Отмена — добавить колоды к существующим'
-                );
-
-                if (shouldReplace) {
+                const choice = await showImportChoiceModal();
+                if (choice === null) return;
+                if (choice === 'replace') {
                     folders = imported;
+                    const resetStatsToo = await showConfirmModal(
+                        'Сбросить статистику?',
+                        'Данные заменены. Сбросить также статистику и достижения (серии, дни занятий, значки)? Прогресс изучения слов это не затронет.',
+                        { confirmLabel: 'Сбросить', cancelLabel: 'Оставить как есть' }
+                    );
+                    if (resetStatsToo) {
+                        stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0 };
+                        await saveStats();
+                    }
                 } else {
                     regenerateImportedIds(imported);
                     folders = folders.concat(imported);
                 }
-
                 deduplicateSystemFolders();
-
                 validateAndRepairData();
                 await migrateOldBase64Images();
                 await saveData();
-
-                alert('Данные успешно импортированы');
+                await showAlertModal('Готово', 'Данные успешно импортированы');
                 showFoldersView();
                 await checkAchievements();
-
             } catch (err) {
                 console.error('Ошибка импорта:', err);
-                alert('Ошибка импорта: ' + err.message + '\n\nПроверьте файл и попробуйте снова.');
+                await showAlertModal('Ошибка', 'Ошибка импорта: ' + err.message + '\n\nПроверьте файл и попробуйте снова.');
             }
         }
 
         async function importFromFile() {
             const input = document.getElementById('import-file-input');
             const file = input.files[0];
-            if (!file) return alert('Выберите файл');
-
+            if (!file) return await showAlertModal('Ошибка', 'Выберите файл');
             const reader = new FileReader();
             reader.onload = async (e) => {
                 await importData(e.target.result);
@@ -2810,42 +3318,51 @@ Back: Красивый</pre>
 
         // ==================== НАСТРОЙКИ ====================
         function showSettingsView() {
+            resetSelectionState();
             document.getElementById('current-folder-name').textContent = 'Настройки';
             const container = document.getElementById('main-content');
             container.innerHTML = `
                 <div class="scrollable-content px-1 pt-2 pb-4">
                     <h2 class="text-xl font-semibold mb-3">Настройки</h2>
-
                     <div class="panel">
                         <div class="font-semibold text-base mb-3">Колоды</div>
-                        <button onclick="createFolder()" class="menu-item">
-                            <i class="fa-solid fa-plus w-5 text-teal-600"></i> <span>Создать колоду</span>
-                        </button>
+                        <button onclick="createFolder()" class="menu-item"><i class="fa-solid fa-plus w-5 text-teal-600"></i> <span>Создать колоду</span></button>
                         <button onclick="showDeleteFolderModal()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-red-600 text-base touch-target">
                             <i class="fa-solid fa-trash w-5"></i> <span>Удалить колоду</span>
                         </button>
                     </div>
-
                     <div class="panel">
-                        <div class="font-semibold text-base mb-3">Лимит повторений</div>
+                        <div class="font-semibold text-base mb-3">Лимит новых слов</div>
                         <label class="flex items-center gap-3 cursor-pointer mb-2">
                             <input type="checkbox" id="limit-toggle" ${dailyLimitEnabled ? 'checked' : ''} onchange="toggleLimit(this.checked)" class="w-5 h-5 accent-teal-600">
-                            <span class="text-sm">Ограничивать количество карточек в день</span>
+                            <span class="text-sm">Ограничивать новые слова в день</span>
                         </label>
                         <div id="limit-count-wrapper" class="${dailyLimitEnabled ? '' : 'hidden'} mt-2">
-                            <label class="text-sm">Максимум карточек:</label>
+                            <label class="text-sm">Максимум новых слов в день:</label>
                             <input type="number" id="limit-count" value="${dailyLimitCount}" min="1" max="999" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" onchange="updateLimitCount(this.value)">
                         </div>
+                        <div class="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                            Ограничивает только новые слова — карточки на повторение показываются без лимита по числу. Для них лучше ориентироваться на время сессии (30–50 минут), а не на жёсткий счётчик.
+                        </div>
                     </div>
-
+                    <div class="panel">
+                        <div class="font-semibold text-base mb-3">Порог предложения архивации</div>
+                        <label class="text-sm">Предлагать слово в архив, когда интервал повторения достигнет:</label>
+                        <select id="archive-threshold-select" onchange="updateArchiveThreshold(this.value)" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
+                            <option value="30" ${archiveThresholdDays === 30 ? 'selected' : ''}>Раньше — 30 дней</option>
+                            <option value="60" ${archiveThresholdDays === 60 ? 'selected' : ''}>Сбалансированно — 60 дней</option>
+                            <option value="90" ${archiveThresholdDays === 90 ? 'selected' : ''}>Позже — 90 дней</option>
+                            <option value="180" ${archiveThresholdDays === 180 ? 'selected' : ''}>Очень поздно — 180 дней</option>
+                            <option value="0" ${archiveThresholdDays === 0 ? 'selected' : ''}>Никогда не предлагать</option>
+                        </select>
+                        <div class="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                            Меньше — быстрее разгружаешь колоду от явно знакомых слов. Больше — увереннее в закреплении (полезно, например, перед экзаменом).
+                        </div>
+                    </div>
                     <div class="panel">
                         <div class="flex items-center justify-between mb-3">
                             <div class="font-semibold text-base">Импорт слов</div>
-                            <button onclick="showImportHelpModal()" 
-                                    class="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-x-1 touch-target">
-                                <i class="fa-solid fa-info-circle"></i>
-                                <span>Как импортировать</span>
-                            </button>
+                            <button onclick="showImportHelpModal()" class="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-x-1 touch-target"><i class="fa-solid fa-info-circle"></i> <span>Как импортировать</span></button>
                         </div>
                         <div class="mb-3"><label class="block text-sm mb-1">Колода</label>
                             <select id="import-folder-select" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 touch-target">
@@ -2855,7 +3372,6 @@ Back: Красивый</pre>
                         <textarea id="import-text" placeholder="Вставьте слова или предложения в любом поддерживаемом формате" class="w-full h-28 p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 font-mono text-sm"></textarea>
                         <button onclick="importWords()" class="w-full mt-3 py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target">Импортировать</button>
                     </div>
-
                     <div class="panel">
                         <div class="font-semibold text-base mb-3">Резервное копирование</div>
                         <button onclick="exportAllData()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-base touch-target mb-1">
@@ -2865,63 +3381,61 @@ Back: Красивый</pre>
                         <input type="file" id="import-file-input" accept=".json" class="w-full text-sm touch-target px-1">
                         <button onclick="importFromFile()" class="w-full mt-2 py-3 rounded-xl bg-indigo-600 text-white font-medium text-base touch-target">Загрузить</button>
                     </div>
-
                     <div class="panel">
                         <div class="font-semibold text-base mb-3">Сброс прогресса</div>
-                        <button onclick="showResetFolderSelectionModal()" class="menu-item">
-                            <i class="fa-solid fa-undo w-5 text-amber-500"></i> <span>Сбросить прогресс выбранной колоды</span>
-                        </button>
-                        <button onclick="resetAllProgress()" class="menu-item">
-                            <i class="fa-solid fa-xmark w-5 text-slate-800 dark:text-slate-200"></i> <span>Сбросить прогресс всех колод</span>
-                        </button>
+                        <button onclick="showResetFolderSelectionModal()" class="menu-item"><i class="fa-solid fa-undo w-5 text-amber-500"></i> <span>Сбросить прогресс выбранной колоды</span></button>
+                        <button onclick="resetAllProgress()" class="menu-item"><i class="fa-solid fa-xmark w-5 text-slate-800 dark:text-slate-200"></i> <span>Сбросить прогресс всех колод</span></button>
                     </div>
-
                     <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4">
                         <div class="font-semibold text-base mb-3">Статистика и достижения</div>
-                        <button onclick="resetAchievements()" class="menu-item">
-                            <i class="fa-solid fa-trophy w-5 text-amber-500"></i> <span>Сбросить все достижения</span>
-                        </button>
-                        <button onclick="resetAllStats()" class="menu-item">
-                            <i class="fa-solid fa-eraser w-5 text-red-500"></i> <span>Сбросить всю статистику и достижения</span>
-                        </button>
+                        <button onclick="resetAchievements()" class="menu-item"><i class="fa-solid fa-trophy w-5 text-amber-500"></i> <span>Сбросить все достижения</span></button>
+                        <button onclick="resetAllStats()" class="menu-item"><i class="fa-solid fa-eraser w-5 text-red-500"></i> <span>Сбросить всю статистику и достижения</span></button>
                     </div>
                 </div>
             `;
         }
 
-        function toggleLimit(enabled) {
+        async function toggleLimit(enabled) {
             dailyLimitEnabled = enabled;
-            saveLimitSettings();
+            await saveLimitSettings();
             document.getElementById('limit-count-wrapper').classList.toggle('hidden', !enabled);
         }
 
-        function updateLimitCount(value) {
+        async function updateLimitCount(value) {
             const num = parseInt(value);
             if (!isNaN(num) && num > 0) {
                 dailyLimitCount = num;
-                saveLimitSettings();
+                await saveLimitSettings();
             }
         }
 
+        async function updateArchiveThreshold(value) {
+            const num = parseInt(value);
+            archiveThresholdDays = num; // 0 означает "никогда не предлагать" (см. select ниже)
+            await saveLimitSettings();
+        }
+
         async function resetAchievements() {
-            if (!confirm('Сбросить все достижения? Вы сможете получить их заново. Статистика занятий останется.')) return;
+            const ok = await showConfirmModal('Сбросить достижения', 'Сбросить все достижения?', { confirmLabel: 'Сбросить' });
+            if (!ok) return;
             stats.unlocked = {};
             await saveStats();
             if (document.getElementById('current-folder-name').textContent === 'Статистика') {
                 showStatsView();
             } else {
-                alert('Достижения сброшены');
+                await showAlertModal('Готово', 'Достижения сброшены');
             }
         }
 
         async function resetAllStats() {
-            if (!confirm('Сбросить всю статистику и достижения? Будут удалены все данные об активности, сериях, днях занятий, достижениях. Прогресс карточек не будет затронут.')) return;
-            stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0 };
+            const ok = await showConfirmModal('Сбросить статистику', 'Сбросить всю статистику и достижения?', { confirmLabel: 'Сбросить' });
+            if (!ok) return;
+            stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0 };
             await saveStats();
             if (document.getElementById('current-folder-name').textContent === 'Статистика') {
                 showStatsView();
             } else {
-                alert('Статистика и достижения сброшены');
+                await showAlertModal('Готово', 'Статистика и достижения сброшены');
             }
         }
 
@@ -2950,12 +3464,13 @@ Back: Красивый</pre>
         }
 
         async function resetSelectedFolderProgress(folderId) {
-            if (!confirm('Сбросить прогресс всех слов в этой колоде?')) return;
             const folder = folders.find(f => f.id === folderId);
             if (!folder) return;
+            const ok = await showConfirmModal('Сбросить прогресс колоды', `Сбросить прогресс всех слов в колоде «${folder.name}»?`, { confirmLabel: 'Сбросить' });
+            if (!ok) return;
             folder.cards.forEach(c => resetCardProgress(c));
             await saveData();
-            alert(`Прогресс в колоде «${folder.name}» сброшен`);
+            await showAlertModal('Готово', `Прогресс в колоде «${folder.name}» сброшен`);
             if (currentFolderId === folderId) {
                 showFolderCards(folderId);
             } else {
@@ -2964,23 +3479,25 @@ Back: Красивый</pre>
         }
 
         async function resetAllProgress() {
-            if (!confirm('Сбросить прогресс ВСЕХ слов во всех колодах?')) return;
+            const ok = await showConfirmModal('Сбросить весь прогресс', 'Сбросить прогресс ВСЕХ слов во всех колодах?', { confirmLabel: 'Сбросить всё' });
+            if (!ok) return;
             folders.forEach(folder => {
                 folder.cards.forEach(c => resetCardProgress(c));
             });
             await saveData();
-            alert('Прогресс всех колод сброшен');
+            await showAlertModal('Готово', 'Прогресс всех колод сброшен');
             showFoldersView();
         }
 
-        function showDeleteFolderModal() {
+        async function showDeleteFolderModal() {
             const deletable = folders.filter(f => !f.system);
             if (deletable.length === 0) {
-                alert('Нет колод, которые можно удалить.');
+                await showAlertModal('Нет колод', 'Нет колод, которые можно удалить.');
                 return;
             }
             if (deletable.length === 1) {
-                if (confirm(`Удалить колоду «${deletable[0].name}»?`)) performDeleteFolder(deletable[0].id);
+                const ok = await showConfirmModal('Удалить колоду', `Удалить колоду «${deletable[0].name}»?`, { confirmLabel: 'Удалить' });
+                if (ok) performDeleteFolder(deletable[0].id);
                 return;
             }
             const modal = document.createElement('div');
@@ -3002,55 +3519,69 @@ Back: Красивый</pre>
         }
 
         async function confirmDeleteFolder(folderId) {
-            if (!confirm('Удалить эту колоду?')) return;
+            const folder = folders.find(f => f.id === folderId);
+            const ok = await showConfirmModal('Удалить колоду', `Удалить колоду${folder ? ` «${folder.name}»` : ''}?`, { confirmLabel: 'Удалить' });
+            if (!ok) return;
             await performDeleteFolder(folderId);
         }
 
         async function performDeleteFolder(folderId) {
             const folder = folders.find(f => f.id === folderId);
             if (folder && folder.system) {
-                alert('Папку «Изученные слова» нельзя удалить — в ней хранится прогресс по выученным словам.');
+                await showAlertModal('Ошибка', 'Колоду «Изученные слова» нельзя удалить — в ней хранится прогресс по выученным словам.');
                 return;
             }
-
             if (folder && folder.cards) {
                 for (const card of folder.cards) {
                     if (card._imageObjectUrl) URL.revokeObjectURL(card._imageObjectUrl);
                     if (card.imageId) await MediaStore.deleteImage(card.imageId);
                 }
             }
-
             folders = folders.filter(f => f.id !== folderId);
             if (folders.length > 0) currentFolderId = folders[0].id;
             await saveData();
             showFoldersView();
         }
 
-        // ==================== УЛУЧШЕННАЯ ОЗВУЧКА ====================
+        // ==================== TTS (ОЗВУЧКА) ====================
         function detectLanguage(text) {
             if (/[а-яё]/i.test(text)) return 'ru';
             return 'en';
         }
 
+        // Новая версия speakWord: русский — сразу через speechSynthesis (мгновенно,
+        // без похода в сеть), английский — через Google TTS с коротким таймаутом
+        // и падением на speechSynthesis при неудаче. Кеширование Blob + удаление эмодзи.
         async function speakWord(text) {
+            if (!text) return;
+            text = removeEmojis(text);
             if (!text) return;
 
             const lang = detectLanguage(text);
             const langCode = lang === 'en' ? 'en-US' : 'ru-RU';
+
+            // Для русского Google TTS не даёт заметного выигрыша в качестве, а сеть
+            // добавляет задержку — поэтому сразу используем локальный speechSynthesis.
+            if (lang === 'ru') {
+                await fallbackSpeak(text, lang);
+                return;
+            }
+
             const cacheKey = `${lang}:${text}`;
 
-            if (audioCache.has(cacheKey)) {
-                const cachedUrl = audioCache.get(cacheKey);
-                const audio = new Audio(cachedUrl);
+            if (audioBlobCache.has(cacheKey)) {
+                const blob = audioBlobCache.get(cacheKey);
+                const url = URL.createObjectURL(blob);
+                const audio = new Audio(url);
                 audio.play();
+                audio.onended = () => URL.revokeObjectURL(url);
                 return;
             }
 
             try {
                 const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${langCode}&client=tw-ob&q=${encodeURIComponent(text)}`;
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-
+                const timeoutId = setTimeout(() => controller.abort(), CONSTANTS.TTS_TIMEOUT_MS);
                 const response = await fetch(url, {
                     headers: {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -3059,11 +3590,10 @@ Back: Красивый</pre>
                     signal: controller.signal
                 });
                 clearTimeout(timeoutId);
-
                 if (response.ok) {
                     const blob = await response.blob();
+                    audioBlobCache.set(cacheKey, blob);
                     const audioUrl = URL.createObjectURL(blob);
-                    audioCache.set(cacheKey, audioUrl);
                     const audio = new Audio(audioUrl);
                     audio.play();
                     audio.onended = () => URL.revokeObjectURL(audioUrl);
@@ -3077,20 +3607,37 @@ Back: Красивый</pre>
             }
         }
 
+        // Выбирает лучший доступный голос: сначала по точному совпадению языка,
+        // затем отдаёт предпочтение «улучшенным»/нейросетевым голосам (обычно
+        // заметно приятнее звучат, чем голос по умолчанию), избегая явно урезанных.
+        function pickBestVoice(voices, langCode, lang) {
+            if (!voices || voices.length === 0) return null;
+
+            const exact = voices.filter(v => v.lang === langCode);
+            const partial = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith(lang));
+            const pool = exact.length > 0 ? exact : (partial.length > 0 ? partial : voices);
+
+            const scored = pool.map(v => {
+                const name = (v.name || '').toLowerCase();
+                let score = 0;
+                if (/premium|enhanced|neural|natural|wavenet/.test(name)) score += 10;
+                if (/compact/.test(name)) score -= 5;
+                if (v.localService) score += 1;
+                return { voice: v, score };
+            });
+            scored.sort((a, b) => b.score - a.score);
+            return scored[0].voice;
+        }
+
         async function fallbackSpeak(text, lang) {
             if (!window.speechSynthesis) return;
+            text = removeEmojis(text);
+            if (!text) return;
             window.speechSynthesis.cancel();
 
             const voices = await loadVoices();
             const langCode = lang === 'en' ? 'en-US' : 'ru-RU';
-
-            let voice = null;
-            if (voices.length > 0) {
-                voice = voices.find(v => v.lang === langCode);
-                if (!voice) voice = voices.find(v => v.lang.startsWith(lang));
-                if (!voice) voice = voices.find(v => v.lang.includes(lang));
-                if (!voice) voice = voices[0];
-            }
+            const voice = pickBestVoice(voices, langCode, lang);
 
             const utterance = new SpeechSynthesisUtterance(text);
             if (voice) utterance.voice = voice;
@@ -3128,7 +3675,6 @@ Back: Красивый</pre>
                     window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
                 };
                 window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged);
-
                 setTimeout(() => {
                     if (!voicesLoaded) {
                         const v = window.speechSynthesis.getVoices();
@@ -3144,28 +3690,21 @@ Back: Красивый</pre>
         }
 
         // ==================== PWA ====================
-        function generateIcon(size) {
-            const canvas = document.createElement('canvas');
-            canvas.width = size;
-            canvas.height = size;
+        function drawIcon(canvas, size) {
             const ctx = canvas.getContext('2d', { alpha: true });
-
             const grad = ctx.createLinearGradient(0, 0, size, size);
             grad.addColorStop(0, '#0f766e');
             grad.addColorStop(0.5, '#134e4b');
             grad.addColorStop(1, '#0c3d3a');
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, size, size);
-
             ctx.strokeStyle = 'rgba(255,255,255,0.08)';
             ctx.lineWidth = size * 0.03;
             ctx.strokeRect(size * 0.08, size * 0.08, size * 0.84, size * 0.84);
-
             const bookX = size * 0.22;
             const bookY = size * 0.28;
             const bookW = size * 0.56;
             const bookH = size * 0.48;
-
             ctx.fillStyle = '#f1e7d2';
             ctx.beginPath();
             ctx.moveTo(bookX, bookY);
@@ -3174,7 +3713,6 @@ Back: Красивый</pre>
             ctx.lineTo(bookX, bookY + bookH);
             ctx.closePath();
             ctx.fill();
-
             ctx.beginPath();
             ctx.moveTo(bookX + bookW / 2 + size * 0.02, bookY);
             ctx.lineTo(bookX + bookW, bookY);
@@ -3182,7 +3720,6 @@ Back: Красивый</pre>
             ctx.lineTo(bookX + bookW / 2 + size * 0.02, bookY + bookH);
             ctx.closePath();
             ctx.fill();
-
             ctx.strokeStyle = '#0f766e';
             ctx.lineWidth = size * 0.018;
             for (let i = 0; i < 4; i++) {
@@ -3196,7 +3733,6 @@ Back: Красивый</pre>
                 ctx.lineTo(bookX + bookW - size * 0.06, y);
                 ctx.stroke();
             }
-
             ctx.strokeStyle = 'rgba(13, 148, 136, 0.55)';
             ctx.lineWidth = size * 0.012;
             ctx.beginPath();
@@ -3207,14 +3743,19 @@ Back: Красивый</pre>
             ctx.moveTo(bookX + bookW / 2 - size * 0.01, bookY + size * 0.45);
             ctx.lineTo(bookX + bookW / 2 + size * 0.01, bookY + size * 0.55);
             ctx.stroke();
+        }
 
+        function generateIcon(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            drawIcon(canvas, size);
             return canvas.toDataURL('image/png');
         }
 
         function createManifest() {
             const icon192 = generateIcon(192);
             const icon512 = generateIcon(512);
-
             const manifest = {
                 name: 'Vocabulary',
                 short_name: 'Vocab',
@@ -3231,7 +3772,6 @@ Back: Красивый</pre>
                     { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
                 ]
             };
-
             const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
             return URL.createObjectURL(blob);
         }
@@ -3245,18 +3785,38 @@ Back: Красивый</pre>
         })();
 
         (function () {
-            const link = document.createElement('link');
-            link.rel = 'apple-touch-icon';
-            link.href = generateIcon(180);
-            document.head.appendChild(link);
+            const canvas = document.createElement('canvas');
+            canvas.width = 180;
+            canvas.height = 180;
+            drawIcon(canvas, 180);
+            canvas.toBlob(function (blob) {
+                const iconUrl = URL.createObjectURL(blob);
+                const link = document.createElement('link');
+                link.rel = 'apple-touch-icon';
+                link.sizes = '180x180';
+                link.href = iconUrl;
+                document.head.appendChild(link);
+            }, 'image/png');
         })();
+
+        // ==================== ESCAPE ОБРАБОТЧИК ====================
+        function setupEscapeHandler() {
+            if (!escapeHandlerAdded) {
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && selectionMode) {
+                        exitSelectionMode();
+                    }
+                });
+                escapeHandlerAdded = true;
+            }
+        }
 
         // ==================== ИНИЦИАЛИЗАЦИЯ ====================
         async function init() {
             await loadData();
             validateAndRepairData();
             await loadStats();
-            loadLimitSettings();
+            await loadLimitSettings();
             initTheme();
 
             const mediaAvailable = await MediaStore.init();
@@ -3268,6 +3828,9 @@ Back: Красивый</pre>
             document.getElementById('current-folder-name').textContent = 'Мои колоды';
             showFoldersView();
             await checkAchievements();
+
+            // Устанавливаем обработчик Escape (без дублирования)
+            setupEscapeHandler();
         }
 
         function flushPendingChanges() {
