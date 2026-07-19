@@ -499,7 +499,6 @@
         let dailyLimitCount = 20;
         let archiveThresholdDays = 30;
         let shuffleEnabled = true;
-        let preferredVoiceURI = null;
         let sessionStableCandidates = [];
         let statsCalendarOffset = 0; // 0 = текущий месяц, -1 = предыдущий и т.д.
 
@@ -507,8 +506,9 @@
         let selectionMode = false;
         let selectedCardIds = new Set();
 
-        // ---- Аудиокеш (Blob) ----
-        const audioBlobCache = new Map();
+        // ---- Аудиокеш (готовые <audio>-элементы Google TTS, чтобы повторный клик
+        // по тому же слову не бил в сеть заново) ----
+        const googleAudioCache = new Map();
 
         // ---- Защита Escape ----
         let escapeHandlerAdded = false;
@@ -813,7 +813,6 @@
                     dailyLimitCount = parseInt(stored.dailyLimitCount) || 20;
                     archiveThresholdDays = stored.archiveThresholdDays !== undefined ? Number(stored.archiveThresholdDays) : 30;
                     shuffleEnabled = stored.shuffleEnabled !== undefined ? !!stored.shuffleEnabled : true;
-                    preferredVoiceURI = stored.preferredVoiceURI || null;
                     return;
                 }
             } catch (e) {
@@ -832,7 +831,7 @@
 
         async function saveLimitSettings() {
             try {
-                await localforage.setItem('limitSettings', { dailyLimitEnabled, dailyLimitCount, archiveThresholdDays, shuffleEnabled, preferredVoiceURI });
+                await localforage.setItem('limitSettings', { dailyLimitEnabled, dailyLimitCount, archiveThresholdDays, shuffleEnabled });
             } catch (e) {
                 console.error('Ошибка сохранения настроек лимита:', e);
             }
@@ -2626,11 +2625,6 @@
                             </button>
                         </div>
                     </div>
-                    <div class="flex justify-center mb-1">
-                        <button onclick="showRatingHelp()" class="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-x-1 px-3 py-2 touch-target">
-                            <i class="fa-solid fa-circle-question"></i> Как оценивать?
-                        </button>
-                    </div>
                     <div class="rating-buttons">
                         <button onclick="rateCard(1)" class="rating-btn bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800">Снова<br><span class="text-xs opacity-75">${intervalPreview[0]}</span></button>
                         <button onclick="rateCard(2)" class="rating-btn bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">Трудно<br><span class="text-xs opacity-75">${intervalPreview[1]}</span></button>
@@ -2873,20 +2867,6 @@
         }, 200));
 
         let isRatingCard = false;
-
-        function showRatingHelp() {
-            showAlertModal(
-                'Как оценивать карточку',
-                'Оценивайте не старание, а то, насколько легко вспомнилось слово:\n\n' +
-                '🔴 Снова — не вспомнили, карточка вернётся совсем скоро.\n' +
-                '🟠 Трудно — вспомнили, но с усилием или не сразу.\n' +
-                '🟢 Хорошо — вспомнили уверенно, с обычным усилием.\n' +
-                '🔵 Легко — вспомнили мгновенно, без малейшей заминки.\n\n' +
-                'Точный интервал до следующего показа виден прямо под каждой кнопкой — он меняется в зависимости от вашей истории ответов по этому слову.\n\n' +
-                'На новом слове «Хорошо» три раза подряд выводит его на повторение примерно через 3 дня, а «Легко» сразу пропускает шаги обучения и даёт интервал сразу около 16 дней — система как бы верит вам, что слово и так отлично знакомо.',
-                'Понятно'
-            );
-        }
 
         async function rateCard(grade) {
             if (isRatingCard) return;
@@ -3527,15 +3507,6 @@ Back: Красивый</pre>
                         </div>
                     </div>
                     <div class="panel">
-                        <div class="font-semibold text-base mb-3">Голос озвучки (английский)</div>
-                        <select id="voice-select" onchange="updatePreferredVoice(this.value)" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
-                            <option value="">Загрузка голосов…</option>
-                        </select>
-                        <div class="text-xs text-slate-400 dark:text-slate-500 mt-2">
-                            Английские слова обычно озвучивает встроенный сервис Google — он звучит лучше, но акцент не выбрать. Этот голос устройства используется только как запасной, если сервис недоступен.
-                        </div>
-                    </div>
-                    <div class="panel">
                         <div class="font-semibold text-base mb-3">Порог предложения архивации</div>
                         <label class="text-sm">Предлагать слово в архив, когда интервал повторения достигнет:</label>
                         <select id="archive-threshold-select" onchange="updateArchiveThreshold(this.value)" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
@@ -3583,30 +3554,11 @@ Back: Красивый</pre>
                     </div>
                 </div>
             `;
-            populateVoiceSelect();
         }
 
         async function toggleShuffle(enabled) {
             shuffleEnabled = enabled;
             await saveLimitSettings();
-        }
-
-        async function updatePreferredVoice(voiceURI) {
-            preferredVoiceURI = voiceURI || null;
-            await saveLimitSettings();
-        }
-
-        async function populateVoiceSelect() {
-            const select = document.getElementById('voice-select');
-            if (!select) return;
-            const voices = await loadVoices();
-            const englishVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('en'));
-            if (englishVoices.length === 0) {
-                select.innerHTML = '<option value="">Голоса не найдены на устройстве</option>';
-                return;
-            }
-            select.innerHTML = '<option value="">Автоматически (рекомендуется)</option>' +
-                englishVoices.map(v => `<option value="${escapeHtml(v.voiceURI)}" ${v.voiceURI === preferredVoiceURI ? 'selected' : ''}>${escapeHtml(v.name)} (${escapeHtml(v.lang)})</option>`).join('');
         }
 
         async function toggleLimit(enabled) {
@@ -3769,38 +3721,48 @@ Back: Красивый</pre>
             return cyrillicCount > latinCount ? 'ru' : 'en';
         }
 
-        async function googleTtsSpeak(text, langCode) {
-            const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${langCode}&client=tw-ob&q=${encodeURIComponent(text)}`;
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), CONSTANTS.TTS_TIMEOUT_MS);
-            try {
-                const response = await fetch(url, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                        'Referer': 'https://translate.google.com/',
-                    },
-                    signal: controller.signal
-                });
-                if (!response.ok) throw new Error(`Google TTS ответил с ошибкой ${response.status}`);
-                return await response.blob();
-            } finally {
-                clearTimeout(timeoutId);
-            }
-        }
+        // Играет Google TTS напрямую через <audio>, БЕЗ fetch(). Это принципиально:
+        // fetch() к чужому домену требует, чтобы сервер сам разрешил CORS-заголовком
+        // чтение ответа — а Google TTS неофициальный, такого заголовка может не быть,
+        // и fetch() тогда молча проваливается при каждом запросе. Аудио-тег имеет
+        // право проигрывать чужой домен без единого CORS-заголовка — это отдельное,
+        // куда более старое правило браузеров, и именно так этот трюк работает везде,
+        // где он реально работает.
+        function playGoogleTts(text, langCode) {
+            return new Promise((resolve, reject) => {
+                const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${langCode}&client=tw-ob&q=${encodeURIComponent(text)}`;
+                const audio = new Audio(url);
+                let settled = false;
+                const timer = setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    reject(new Error('Google TTS: таймаут'));
+                }, CONSTANTS.TTS_TIMEOUT_MS);
 
-        function playCachedBlob(blob) {
-            const url = URL.createObjectURL(blob);
-            const audio = new Audio(url);
-            audio.onended = () => URL.revokeObjectURL(url);
-            audio.play().catch(err => {
-                console.warn('audio.play() отклонён браузером:', err.message);
-                URL.revokeObjectURL(url);
+                audio.addEventListener('error', () => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    reject(new Error('Google TTS: ошибка загрузки аудио'));
+                });
+
+                audio.play().then(() => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    resolve(audio);
+                }).catch((err) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    reject(err);
+                });
             });
         }
 
         // Русский — сразу через speechSynthesis (внешние сервисы для него на практике
         // не срабатывают, не тратим время на заведомо провальную попытку). Английский —
-        // через Google TTS (единственное, что подтверждённо работает) с откатом на
+        // Google TTS напрямую через <audio> (см. playGoogleTts) с откатом на
         // speechSynthesis при неудаче.
         async function speakWord(text) {
             if (!text) return;
@@ -3814,18 +3776,17 @@ Back: Красивый</pre>
                 return;
             }
 
-            const langCode = 'en-US';
-            const cacheKey = `${lang}:${text}`;
-
-            if (audioBlobCache.has(cacheKey)) {
-                playCachedBlob(audioBlobCache.get(cacheKey));
+            const cacheKey = `en:${text}`;
+            const cachedAudio = googleAudioCache.get(cacheKey);
+            if (cachedAudio) {
+                cachedAudio.currentTime = 0;
+                cachedAudio.play().catch(() => {});
                 return;
             }
 
             try {
-                const blob = await googleTtsSpeak(text, langCode);
-                audioBlobCache.set(cacheKey, blob);
-                playCachedBlob(blob);
+                const audio = await playGoogleTts(text, 'en-US');
+                googleAudioCache.set(cacheKey, audio);
             } catch (error) {
                 console.warn('Google TTS не сработал, переключаемся на speechSynthesis:', error.message);
                 await fallbackSpeak(text, lang);
@@ -3837,11 +3798,6 @@ Back: Красивый</pre>
         // заметно приятнее звучат, чем голос по умолчанию), избегая явно урезанных.
         function pickBestVoice(voices, langCode, lang) {
             if (!voices || voices.length === 0) return null;
-
-            if (lang === 'en' && preferredVoiceURI) {
-                const preferred = voices.find(v => v.voiceURI === preferredVoiceURI);
-                if (preferred) return preferred;
-            }
 
             const exact = voices.filter(v => v.lang === langCode);
             const partial = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith(lang));
