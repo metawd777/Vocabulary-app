@@ -425,7 +425,6 @@
             MAX_UNDO_STEPS: 5,
             DEBOUNCE_SAVE_DELAY_MS: 450,
             TTS_TIMEOUT_MS: 2200,
-            EDGE_TTS_TIMEOUT_MS: 2000,
             MIN_STUDY_FONT_SCALE: 0.35,
             LONG_PRESS_DURATION_MS: 520,
         };
@@ -447,15 +446,6 @@
         let archiveThresholdDays = 30;
         let shuffleEnabled = true;
         let preferredVoiceURI = null;
-        let preferredEdgeVoice = 'en-US-AriaNeural';
-        const EDGE_ENGLISH_VOICES = [
-            { id: 'en-US-AriaNeural', label: 'Aria — американский, женский' },
-            { id: 'en-US-GuyNeural', label: 'Guy — американский, мужской' },
-            { id: 'en-US-JennyNeural', label: 'Jenny — американский, женский, мягкий' },
-            { id: 'en-US-ChristopherNeural', label: 'Christopher — американский, мужской, глубокий' },
-            { id: 'en-GB-SoniaNeural', label: 'Sonia — британский, женский' },
-            { id: 'en-GB-RyanNeural', label: 'Ryan — британский, мужской' },
-        ];
         let sessionStableCandidates = [];
         let statsCalendarOffset = 0; // 0 = текущий месяц, -1 = предыдущий и т.д.
 
@@ -770,7 +760,6 @@
                     archiveThresholdDays = stored.archiveThresholdDays !== undefined ? Number(stored.archiveThresholdDays) : 30;
                     shuffleEnabled = stored.shuffleEnabled !== undefined ? !!stored.shuffleEnabled : true;
                     preferredVoiceURI = stored.preferredVoiceURI || null;
-                    preferredEdgeVoice = stored.preferredEdgeVoice || 'en-US-AriaNeural';
                     return;
                 }
             } catch (e) {
@@ -789,7 +778,7 @@
 
         async function saveLimitSettings() {
             try {
-                await localforage.setItem('limitSettings', { dailyLimitEnabled, dailyLimitCount, archiveThresholdDays, shuffleEnabled, preferredVoiceURI, preferredEdgeVoice });
+                await localforage.setItem('limitSettings', { dailyLimitEnabled, dailyLimitCount, archiveThresholdDays, shuffleEnabled, preferredVoiceURI });
             } catch (e) {
                 console.error('Ошибка сохранения настроек лимита:', e);
             }
@@ -1001,9 +990,9 @@
                 return mins < 60 ? `${mins} мин` : `${Math.round(mins / 60)} ч`;
             }
             const days = Math.max(1, Math.round(value));
-            if (days < 30) return `${days} дн.`;
-            if (days < 365) return `${Math.round(days / 30)} мес.`;
-            return `${(days / 365).toFixed(1)} г.`;
+            if (days < 30) return `~${days} дн.`;
+            if (days < 365) return `~${Math.round(days / 30)} мес.`;
+            return `~${(days / 365).toFixed(1)} г.`;
         }
 
         async function updateCardAfterReview(card, grade) {
@@ -1420,12 +1409,9 @@
                 const key = localDateKey(d);
                 const active = daySet.has(key);
                 const isToday = key === todayKey;
-                const isFuture = d > now && !isToday;
 
                 let cls = 'aspect-square flex items-center justify-center rounded-md text-xs ';
-                if (isFuture) {
-                    cls += 'text-slate-300 dark:text-slate-600';
-                } else if (active) {
+                if (active) {
                     cls += 'bg-teal-500 dark:bg-teal-400 text-white font-medium';
                 } else {
                     cls += 'bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400';
@@ -2330,7 +2316,7 @@
                 actionBar.innerHTML = `
                     <div class="flex items-center gap-x-3 min-w-0">
                         <span class="font-medium text-sm whitespace-nowrap">Выбрано: ${selectedCardIds.size}</span>
-                        <button onclick="exitSelectionMode()" class="text-sm px-3 py-1 rounded-xl bg-slate-200 dark:bg-slate-700 touch-target whitespace-nowrap">Отмена</button>
+                        <button onclick="exitSelectionMode()" class="text-sm px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-700 whitespace-nowrap">Отмена</button>
                     </div>
                     <button onclick="showSelectionActionsMenu()" class="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-xl bg-slate-200 dark:bg-slate-700 touch-target" ${selectedCardIds.size === 0 ? 'disabled style="opacity:0.5"' : ''}>
                         <i class="fa-solid fa-ellipsis-vertical text-lg"></i>
@@ -3048,6 +3034,14 @@
             card.stability = newStability !== undefined ? safeStability(newStability) : undefined;
             card.difficulty = newDifficulty !== undefined ? safeDifficulty(newDifficulty) : undefined;
             card.state = document.getElementById('edit-state').value;
+            // Если выбран статус "На повторении"/"Переучивается", но Stability/Difficulty
+            // не заданы — не оставляем карточку в противоречивом состоянии до следующей
+            // перезагрузки (тогда её тихо сбросит validateAndRepairData). Подставляем
+            // разумные стартовые значения сразу же.
+            if ((card.state === 'review' || card.state === 'relearning')) {
+                if (card.stability === undefined) card.stability = safeStability(fsrsInitialStability(3));
+                if (card.difficulty === undefined) card.difficulty = safeDifficulty(fsrsInitialDifficulty(3));
+            }
             const dateVal = document.getElementById('edit-next-date').value;
             if (dateVal) card.nextReviewDate = new Date(dateVal).toISOString();
             await saveData();
@@ -3473,17 +3467,12 @@ Back: Красивый</pre>
                         </div>
                     </div>
                     <div class="panel">
-                        <div class="font-semibold text-base mb-3">Голос озвучки</div>
-                        <label class="block text-sm mb-1">Английский — акцент</label>
-                        <select id="edge-voice-select" onchange="updatePreferredEdgeVoice(this.value)" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target mb-3">
-                            ${EDGE_ENGLISH_VOICES.map(v => `<option value="${v.id}" ${v.id === preferredEdgeVoice ? 'selected' : ''}>${v.label}</option>`).join('')}
-                        </select>
-                        <label class="block text-sm mb-1">Запасной голос устройства (если нет сети)</label>
+                        <div class="font-semibold text-base mb-3">Голос озвучки (английский)</div>
                         <select id="voice-select" onchange="updatePreferredVoice(this.value)" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
                             <option value="">Загрузка голосов…</option>
                         </select>
                         <div class="text-xs text-slate-400 dark:text-slate-500 mt-2">
-                            Основной голос — нейросетевой сервис Microsoft (естественное звучание, выбор акцента). Если он и Google недоступны (нет сети), используется голос устройства ниже.
+                            Английские слова обычно озвучивает встроенный сервис Google — он звучит лучше, но акцент не выбрать. Этот голос устройства используется только как запасной, если сервис недоступен.
                         </div>
                     </div>
                     <div class="panel">
@@ -3544,11 +3533,6 @@ Back: Красивый</pre>
 
         async function updatePreferredVoice(voiceURI) {
             preferredVoiceURI = voiceURI || null;
-            await saveLimitSettings();
-        }
-
-        async function updatePreferredEdgeVoice(voiceId) {
-            preferredEdgeVoice = voiceId;
             await saveLimitSettings();
         }
 
@@ -3714,85 +3698,6 @@ Back: Красивый</pre>
         }
 
         // ==================== TTS (ОЗВУЧКА) ====================
-        // ==================== EDGE NEURAL TTS ====================
-        const EDGE_TTS_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
-
-        async function generateSecMsGec() {
-            const WIN_EPOCH = 11644473600;
-            let ticks = Math.floor(Date.now() / 1000) + WIN_EPOCH;
-            ticks -= ticks % 300;
-            ticks *= 1e7;
-            const data = new TextEncoder().encode(`${ticks}${EDGE_TTS_TOKEN}`);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-            return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-        }
-
-        function edgeTtsSpeak(text, voiceName, locale) {
-            return new Promise(async (resolve, reject) => {
-                if (!window.crypto?.subtle || !window.WebSocket) {
-                    reject(new Error('Edge TTS недоступен в этом окружении'));
-                    return;
-                }
-                let ws;
-                const timer = setTimeout(() => {
-                    try { ws && ws.close(); } catch (e) {}
-                    reject(new Error('Edge TTS timeout'));
-                }, CONSTANTS.EDGE_TTS_TIMEOUT_MS);
-
-                try {
-                    const secMsGec = await generateSecMsGec();
-                    const connectionId = crypto.randomUUID().replace(/-/g, '');
-                    const wsUrl = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${EDGE_TTS_TOKEN}&Sec-MS-GEC=${secMsGec}&Sec-MS-GEC-Version=1-130.0.2849.68&ConnectionId=${connectionId}`;
-                    ws = new WebSocket(wsUrl);
-                    ws.binaryType = 'arraybuffer';
-                    const chunks = [];
-
-                    ws.onopen = () => {
-                        const now = new Date().toISOString();
-                        ws.send(`X-Timestamp:${now}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n` +
-                            `{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}`);
-
-                        const requestId = crypto.randomUUID().replace(/-/g, '');
-                        const ssml = `<speak version='1.0' xml:lang='${locale}'><voice name='${voiceName}'><prosody pitch='+0Hz' rate='+0%' volume='+0%'>${escapeHtml(text)}</prosody></voice></speak>`;
-                        ws.send(`X-RequestId:${requestId}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${now}\r\nPath:ssml\r\n\r\n${ssml}`);
-                    };
-
-                    ws.onmessage = (event) => {
-                        if (typeof event.data === 'string') {
-                            if (event.data.includes('Path:turn.end')) {
-                                clearTimeout(timer);
-                                ws.close();
-                                resolve(new Blob(chunks, { type: 'audio/mpeg' }));
-                            }
-                            return;
-                        }
-                        const buf = event.data;
-                        const headerLength = new DataView(buf).getUint16(0);
-                        const headerText = new TextDecoder().decode(buf.slice(2, 2 + headerLength));
-                        if (headerText.includes('Path:audio')) {
-                            chunks.push(new Uint8Array(buf.slice(2 + headerLength)));
-                        }
-                    };
-
-                    ws.onerror = () => { clearTimeout(timer); reject(new Error('Edge TTS WebSocket error')); };
-                    ws.onclose = () => { clearTimeout(timer); if (chunks.length === 0) reject(new Error('Edge TTS закрылся без аудио')); };
-                } catch (e) {
-                    clearTimeout(timer);
-                    reject(e);
-                }
-            });
-        }
-
-        function playCachedBlob(blob) {
-            const url = URL.createObjectURL(blob);
-            const audio = new Audio(url);
-            audio.onended = () => URL.revokeObjectURL(url);
-            audio.play().catch(err => {
-                console.warn('audio.play() отклонён браузером:', err.message);
-                URL.revokeObjectURL(url);
-            });
-        }
-
         function detectLanguage(text) {
             if (/[а-яё]/i.test(text)) return 'ru';
             return 'en';
@@ -3817,19 +3722,47 @@ Back: Красивый</pre>
             }
         }
 
-        // Edge TTS и Google TTS запускаются ОДНОВРЕМЕННО (гонка через Promise.any),
-        // а не по очереди — используется тот, кто ответит первым. Раньше Edge TTS
-        // сначала полностью отрабатывал (до 3 секунд), и только потом стартовал
-        // Google — на iOS Safari это съедало контекст пользовательского жеста, и
-        // audio.play() браузер тихо блокировал, поэтому не звучало вообще ничего.
+        // StreamElements проксирует голоса Amazon Polly простым GET-запросом —
+        // без токенов и WebSocket, поэтому надёжнее, чем реверс-инжиниренные
+        // протоколы. Для русского даёт настоящий нейросетевой голос (Tatyana)
+        // вместо системного speechSynthesis.
+        async function streamElementsSpeak(text, voice) {
+            const url = `https://api.streamelements.com/kappa/v2/speech?voice=${voice}&text=${encodeURIComponent(text)}`;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CONSTANTS.TTS_TIMEOUT_MS);
+            try {
+                const response = await fetch(url, { signal: controller.signal });
+                if (!response.ok) throw new Error(`StreamElements TTS ответил с ошибкой ${response.status}`);
+                const blob = await response.blob();
+                if (blob.size < 200) throw new Error('StreamElements TTS вернул пустой ответ');
+                return blob;
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        function playCachedBlob(blob) {
+            const url = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            audio.onended = () => URL.revokeObjectURL(url);
+            audio.play().catch(err => {
+                console.warn('audio.play() отклонён браузером:', err.message);
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        // StreamElements (нейросетевой голос) и Google TTS запускаются ОДНОВРЕМЕННО —
+        // используется тот, кто ответит первым (важно для iOS: долгое ожидание перед
+        // audio.play() браузер может тихо заблокировать). Если оба провайдера
+        // недоступны — откат на встроенный speechSynthesis.
         async function speakWord(text) {
             if (!text) return;
             text = removeEmojis(text);
             if (!text) return;
 
             const lang = detectLanguage(text);
-            const langCode = lang === 'en' ? 'en-US' : 'ru-RU';
-            const edgeVoice = lang === 'en' ? (preferredEdgeVoice || 'en-US-AriaNeural') : 'ru-RU-SvetlanaNeural';
+            const langCode = lang === 'en' ? 'en-US' : 'ru';
+            const seVoice = lang === 'en' ? 'Joanna' : 'Tatyana';
             const cacheKey = `${lang}:${text}`;
 
             if (audioBlobCache.has(cacheKey)) {
@@ -3839,13 +3772,13 @@ Back: Красивый</pre>
 
             try {
                 const blob = await Promise.any([
-                    edgeTtsSpeak(text, edgeVoice, langCode),
+                    streamElementsSpeak(text, seVoice),
                     googleTtsSpeak(text, langCode)
                 ]);
                 audioBlobCache.set(cacheKey, blob);
                 playCachedBlob(blob);
             } catch (aggregateError) {
-                console.warn('Edge TTS и Google TTS оба недоступны, переключаемся на speechSynthesis');
+                console.warn('StreamElements и Google TTS оба недоступны, переключаемся на speechSynthesis');
                 await fallbackSpeak(text, lang);
             }
         }
