@@ -425,7 +425,7 @@
             MAX_UNDO_STEPS: 5,
             DEBOUNCE_SAVE_DELAY_MS: 450,
             TTS_TIMEOUT_MS: 2200,
-            EDGE_TTS_TIMEOUT_MS: 3000,
+            EDGE_TTS_TIMEOUT_MS: 2000,
             MIN_STUDY_FONT_SCALE: 0.35,
             LONG_PRESS_DURATION_MS: 520,
         };
@@ -3786,8 +3786,11 @@ Back: Красивый</pre>
         function playCachedBlob(blob) {
             const url = URL.createObjectURL(blob);
             const audio = new Audio(url);
-            audio.play();
             audio.onended = () => URL.revokeObjectURL(url);
+            audio.play().catch(err => {
+                console.warn('audio.play() отклонён браузером:', err.message);
+                URL.revokeObjectURL(url);
+            });
         }
 
         function detectLanguage(text) {
@@ -3795,10 +3798,30 @@ Back: Красивый</pre>
             return 'en';
         }
 
-        // Цепочка провайдеров озвучки: Edge Neural TTS (лучшее качество, выбор
-        // акцента) → Google TTS (резерв) → локальный speechSynthesis (гарантированный
-        // офлайн-фолбэк). Каждый следующий пробуется только если предыдущий упал
-        // или не ответил за отведённое время.
+        async function googleTtsSpeak(text, langCode) {
+            const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${langCode}&client=tw-ob&q=${encodeURIComponent(text)}`;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CONSTANTS.TTS_TIMEOUT_MS);
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                        'Referer': 'https://translate.google.com/',
+                    },
+                    signal: controller.signal
+                });
+                if (!response.ok) throw new Error(`Google TTS ответил с ошибкой ${response.status}`);
+                return await response.blob();
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        // Edge TTS и Google TTS запускаются ОДНОВРЕМЕННО (гонка через Promise.any),
+        // а не по очереди — используется тот, кто ответит первым. Раньше Edge TTS
+        // сначала полностью отрабатывал (до 3 секунд), и только потом стартовал
+        // Google — на iOS Safari это съедало контекст пользовательского жеста, и
+        // audio.play() браузер тихо блокировал, поэтому не звучало вообще ничего.
         async function speakWord(text) {
             if (!text) return;
             text = removeEmojis(text);
@@ -3815,32 +3838,14 @@ Back: Красивый</pre>
             }
 
             try {
-                const blob = await edgeTtsSpeak(text, edgeVoice, langCode);
+                const blob = await Promise.any([
+                    edgeTtsSpeak(text, edgeVoice, langCode),
+                    googleTtsSpeak(text, langCode)
+                ]);
                 audioBlobCache.set(cacheKey, blob);
                 playCachedBlob(blob);
-                return;
-            } catch (error) {
-                console.warn('Edge TTS не сработал, пробуем Google TTS:', error.message);
-            }
-
-            try {
-                const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${langCode}&client=tw-ob&q=${encodeURIComponent(text)}`;
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), CONSTANTS.TTS_TIMEOUT_MS);
-                const response = await fetch(url, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                        'Referer': 'https://translate.google.com/',
-                    },
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-                if (!response.ok) throw new Error(`Google TTS ответил с ошибкой ${response.status}`);
-                const blob = await response.blob();
-                audioBlobCache.set(cacheKey, blob);
-                playCachedBlob(blob);
-            } catch (error) {
-                console.warn('Google TTS не сработал, переключаемся на speechSynthesis:', error.message);
+            } catch (aggregateError) {
+                console.warn('Edge TTS и Google TTS оба недоступны, переключаемся на speechSynthesis');
                 await fallbackSpeak(text, lang);
             }
         }
