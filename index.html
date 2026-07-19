@@ -322,7 +322,7 @@
     <div id="customModal" class="modal-overlay hidden flex" style="z-index:300;">
         <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[400px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
             <div id="modalTitle" class="text-xl font-semibold mb-2 text-center"></div>
-            <div id="modalMessage" class="text-slate-600 dark:text-slate-300 mb-6 text-center text-base"></div>
+            <div id="modalMessage" class="text-slate-600 dark:text-slate-300 mb-6 text-center text-base whitespace-pre-line"></div>
             <div id="modalButtons" class="flex flex-col gap-2"></div>
         </div>
     </div>
@@ -345,8 +345,11 @@
             </div>
             <details class="mt-3">
                 <summary class="cursor-pointer text-sm text-slate-500 dark:text-slate-400">Дополнительные параметры (FSRS)</summary>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                    Стабильность — насколько долго вы, скорее всего, будете помнить это слово (в днях). Сложность — насколько трудно оно вам даётся, от 1 (легко) до 10 (тяжело). После каждого ответа алгоритм пересчитывает оба значения сам.
+                </p>
                 <p class="text-xs text-amber-600 dark:text-amber-400 mt-2 mb-2">
-                    ⚠️ Изменение Stability и Difficulty может нарушить работу алгоритма повторений. Рекомендуется только опытным пользователям.
+                    ⚠️ Ручное изменение может сбить график повторений — трогайте, только если понимаете, что делаете.
                 </p>
                 <div class="pt-3 grid grid-cols-2 gap-3">
                     <div><label class="block text-xs mb-1">Стабильность</label><input type="number" step="0.01" id="edit-stability" class="field-input"></div>
@@ -422,6 +425,7 @@
             MAX_UNDO_STEPS: 5,
             DEBOUNCE_SAVE_DELAY_MS: 450,
             TTS_TIMEOUT_MS: 2200,
+            EDGE_TTS_TIMEOUT_MS: 3000,
             MIN_STUDY_FONT_SCALE: 0.35,
             LONG_PRESS_DURATION_MS: 520,
         };
@@ -435,13 +439,25 @@
         let editingCardId = null;
         let viewingCardId = null;
         let editContext = 'folder';
-        let stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0 };
+        let stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 } };
         let lastReviewedCard = null;
         let undoStack = [];
         let dailyLimitEnabled = false;
         let dailyLimitCount = 20;
         let archiveThresholdDays = 30;
+        let shuffleEnabled = true;
+        let preferredVoiceURI = null;
+        let preferredEdgeVoice = 'en-US-AriaNeural';
+        const EDGE_ENGLISH_VOICES = [
+            { id: 'en-US-AriaNeural', label: 'Aria — американский, женский' },
+            { id: 'en-US-GuyNeural', label: 'Guy — американский, мужской' },
+            { id: 'en-US-JennyNeural', label: 'Jenny — американский, женский, мягкий' },
+            { id: 'en-US-ChristopherNeural', label: 'Christopher — американский, мужской, глубокий' },
+            { id: 'en-GB-SoniaNeural', label: 'Sonia — британский, женский' },
+            { id: 'en-GB-RyanNeural', label: 'Ryan — британский, мужской' },
+        ];
         let sessionStableCandidates = [];
+        let statsCalendarOffset = 0; // 0 = текущий месяц, -1 = предыдущий и т.д.
 
         // ---- Мультивыбор ----
         let selectionMode = false;
@@ -735,7 +751,9 @@
                         consecutiveCorrect: stored.consecutiveCorrect || 0,
                         maxConsecutiveCorrect: stored.maxConsecutiveCorrect || 0,
                         totalFlips: stored.totalFlips || 0,
-                        totalImages: stored.totalImages || 0
+                        totalImages: stored.totalImages || 0,
+                        newShownToday: stored.newShownToday || { date: null, count: 0 },
+                        longestStreak: stored.longestStreak || 0
                     };
                 }
             } catch (e) {
@@ -750,6 +768,9 @@
                     dailyLimitEnabled = !!stored.dailyLimitEnabled;
                     dailyLimitCount = parseInt(stored.dailyLimitCount) || 20;
                     archiveThresholdDays = stored.archiveThresholdDays !== undefined ? Number(stored.archiveThresholdDays) : 30;
+                    shuffleEnabled = stored.shuffleEnabled !== undefined ? !!stored.shuffleEnabled : true;
+                    preferredVoiceURI = stored.preferredVoiceURI || null;
+                    preferredEdgeVoice = stored.preferredEdgeVoice || 'en-US-AriaNeural';
                     return;
                 }
             } catch (e) {
@@ -768,7 +789,7 @@
 
         async function saveLimitSettings() {
             try {
-                await localforage.setItem('limitSettings', { dailyLimitEnabled, dailyLimitCount, archiveThresholdDays });
+                await localforage.setItem('limitSettings', { dailyLimitEnabled, dailyLimitCount, archiveThresholdDays, shuffleEnabled, preferredVoiceURI, preferredEdgeVoice });
             } catch (e) {
                 console.error('Ошибка сохранения настроек лимита:', e);
             }
@@ -1093,19 +1114,38 @@
             card.masteredSuggestionDismissed = false;
         }
 
+        function shuffleArray(arr) {
+            const a = arr.slice();
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        }
+
         function getDueCardsFromArray(cards) {
             const now = new Date();
-            return cards
-                .filter(card => {
-                    if (!card.nextReviewDate) return true;
-                    const d = new Date(card.nextReviewDate);
-                    return isNaN(d.getTime()) || d <= now;
-                })
-                .sort((a, b) => {
-                    const da = new Date(a.nextReviewDate || 0);
-                    const db = new Date(b.nextReviewDate || 0);
-                    return da - db;
-                });
+            const due = cards.filter(card => {
+                if (!card.nextReviewDate) return true;
+                const d = new Date(card.nextReviewDate);
+                return isNaN(d.getTime()) || d <= now;
+            });
+
+            if (!shuffleEnabled) {
+                return due.sort((a, b) => new Date(a.nextReviewDate || 0) - new Date(b.nextReviewDate || 0));
+            }
+
+            const buckets = new Map();
+            due.forEach(card => {
+                const key = card.nextReviewDate ? localDateKey(new Date(card.nextReviewDate)) : '0';
+                if (!buckets.has(key)) buckets.set(key, []);
+                buckets.get(key).push(card);
+            });
+            let result = [];
+            Array.from(buckets.keys()).sort().forEach(key => {
+                result = result.concat(shuffleArray(buckets.get(key)));
+            });
+            return result;
         }
 
         // Лимит применяется ТОЛЬКО к новым (ещё не изучавшимся) карточкам — это
@@ -1116,14 +1156,24 @@
         // иначе при большом бэклоге лимит просто блокирует прогресс по уже знакомым словам.
         function applyDailyLimit(cards) {
             if (!dailyLimitEnabled) return cards;
-            let newCount = 0;
+            const todayKey = localDateKey(new Date());
+            if (!stats.newShownToday || stats.newShownToday.date !== todayKey) {
+                stats.newShownToday = { date: todayKey, count: 0 };
+            }
+            let newCount = stats.newShownToday.count;
+            let addedThisCall = 0;
             const result = [];
             for (const card of cards) {
                 if (card.state === 'new') {
                     if (newCount >= dailyLimitCount) continue;
                     newCount++;
+                    addedThisCall++;
                 }
                 result.push(card);
+            }
+            if (addedThisCall > 0) {
+                stats.newShownToday.count = newCount;
+                saveStats();
             }
             return result;
         }
@@ -1276,7 +1326,7 @@
         // не даёт, т.к. импортированные карточки создаются в состоянии 'new'.
         const ACHIEVEMENTS = [
             // ---- Первые шаги ----
-            { id: 'first_step', icon: '🌱', title: 'Первый шаг', desc: 'Выучить 1 слово (довести до «На повторении»)', category: 'Активность', check: (g) => g.learnedCount >= 1 },
+            { id: 'first_step', icon: '🌱', title: 'Первый шаг', desc: 'Начать повторять первое слово', category: 'Активность', check: (g) => g.learnedCount >= 1 },
             { id: 'first_photo', icon: '📷', title: 'Первое фото', desc: 'Добавить фото к слову', category: 'Контент', check: (g) => g.totalImages >= 1 },
             { id: 'first_archive', icon: '🏆', title: 'Первый архив', desc: 'Отправить первое слово в архив', category: 'Контент', check: (g) => g.masteredCount >= 1 },
 
@@ -1351,23 +1401,72 @@
             if (achievementQueue.length > 0) setTimeout(showNextAchievement, 250);
         }
 
-        function buildActivityHeatmap() {
+        function buildActivityCalendar(offset) {
             const daySet = new Set(stats.studyDates);
-            const today = new Date();
-            let html = '<div class="grid grid-cols-7 gap-1.5 justify-items-center">';
-            for (let i = 34; i >= 0; i--) {
-                const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
-                const active = daySet.has(localDateKey(d));
-                const isToday = i === 0;
-                const label = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-                html += `<div class="w-full aspect-square rounded-md ${active ? 'bg-teal-500 dark:bg-teal-400' : 'bg-slate-100 dark:bg-slate-800'} ${isToday ? 'ring-2 ring-offset-1 ring-teal-600 dark:ring-teal-300 dark:ring-offset-slate-900' : ''}" title="${label}${active ? ' — занимался' : ''}"></div>`;
+            const now = new Date();
+            const viewDate = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+            const year = viewDate.getFullYear();
+            const month = viewDate.getMonth();
+            const monthLabel = viewDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // 0 = понедельник
+            const todayKey = localDateKey(now);
+            const isCurrentMonth = offset === 0;
+
+            let cells = '';
+            for (let i = 0; i < firstWeekday; i++) cells += '<div></div>';
+            for (let day = 1; day <= daysInMonth; day++) {
+                const d = new Date(year, month, day);
+                const key = localDateKey(d);
+                const active = daySet.has(key);
+                const isToday = key === todayKey;
+                const isFuture = d > now && !isToday;
+
+                let cls = 'aspect-square flex items-center justify-center rounded-md text-xs ';
+                if (isFuture) {
+                    cls += 'text-slate-300 dark:text-slate-600';
+                } else if (active) {
+                    cls += 'bg-teal-500 dark:bg-teal-400 text-white font-medium';
+                } else {
+                    cls += 'bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400';
+                }
+                if (isToday) cls += ' ring-2 ring-offset-1 ring-teal-600 dark:ring-teal-300 dark:ring-offset-slate-800';
+
+                cells += `<div class="${cls}">${day}</div>`;
             }
-            html += '</div>';
-            return html;
+
+            return `
+                <div class="panel" id="activity-calendar">
+                    <div class="flex items-center justify-between mb-3">
+                        <button onclick="changeStatsCalendarMonth(-1)" class="touch-target w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <div class="font-semibold text-base capitalize">${monthLabel}</div>
+                        <button onclick="changeStatsCalendarMonth(1)" class="touch-target w-9 h-9 flex items-center justify-center rounded-full text-slate-500 dark:text-slate-400 ${isCurrentMonth ? 'opacity-30 pointer-events-none' : 'hover:bg-slate-100 dark:hover:bg-slate-700'}">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 mb-1 text-center text-xs text-slate-400 dark:text-slate-500">
+                        <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1">${cells}</div>
+                    <div class="flex items-center gap-x-3 mt-3 text-xs text-slate-500 dark:text-slate-400">
+                        <span class="inline-flex items-center gap-x-1"><span class="inline-block w-3 h-3 rounded-md bg-teal-500 dark:bg-teal-400"></span>занимался</span>
+                        <span class="inline-flex items-center gap-x-1"><span class="inline-block w-3 h-3 rounded-md ring-2 ring-teal-600 dark:ring-teal-300"></span>сегодня</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function changeStatsCalendarMonth(delta) {
+            statsCalendarOffset = Math.min(0, statsCalendarOffset + delta);
+            const container = document.getElementById('activity-calendar');
+            if (container) container.outerHTML = buildActivityCalendar(statsCalendarOffset);
         }
 
         function showStatsView() {
             resetSelectionState();
+            statsCalendarOffset = 0;
             document.getElementById('current-folder-name').textContent = 'Статистика';
             const g = computeGlobalStats();
             const streak = currentStreak();
@@ -1427,14 +1526,10 @@
                             <div class="text-3xl font-bold text-rose-500">${today ? today.total : 0}</div>
                             <div class="stat-label">повторений сегодня</div>
                         </div>
-                        <div class="stat-card">
-                            <div class="text-3xl font-bold text-blue-500">${g.totalFlips || 0}</div>
-                            <div class="stat-label">переворотов</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="text-3xl font-bold text-amber-500">${g.totalImages}</div>
-                            <div class="stat-label">фото</div>
-                        </div>
+                    </div>
+                    <div class="flex items-center justify-center gap-x-4 text-xs text-slate-400 dark:text-slate-500 mb-3">
+                        <span><i class="fa-solid fa-image mr-1"></i>${g.totalImages} фото</span>
+                        <span><i class="fa-solid fa-rotate mr-1"></i>${g.totalFlips || 0} переворотов</span>
                     </div>
                     <div class="panel">
                         <div class="font-semibold text-base mb-3">По статусу</div>
@@ -1442,13 +1537,10 @@
                             <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Новые</span><span class="font-medium">${g.statNew}</span></div>
                             <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Изучаются</span><span class="font-medium">${g.statLearning}</span></div>
                             <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">На повторении</span><span class="font-medium">${g.statReview}</span></div>
-                            <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Переучиваются</span><span class="font-medium">${g.statRelearning}</span></div>
+                            <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400 border-b border-dotted border-slate-400 dark:border-slate-500" onclick="showAlertModal('Переучиваются', 'Это слова, которые вы уже знали, но недавно ответили на них «Снова» — забыли. Они возвращаются на короткие интервалы, пока не закрепятся заново, а затем продолжают обычный график повторений.', 'Понятно')">Переучиваются ⓘ</span><span class="font-medium">${g.statRelearning}</span></div>
                         </div>
                     </div>
-                    <div class="panel">
-                        <div class="font-semibold text-base mb-3">Активность за 5 недель</div>
-                        ${buildActivityHeatmap()}
-                    </div>
+                    ${buildActivityCalendar(statsCalendarOffset)}
                     <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4">
                         <div class="font-semibold text-base mb-3">Достижения</div>
                         ${achievementsHtml}
@@ -1999,7 +2091,7 @@
         function renderCardRow(card) {
             const isSelected = selectedCardIds.has(card.id);
             const row = document.createElement('div');
-            row.className = `flex items-center justify-between p-4 rounded-2xl mb-2 touch-target transition-all ${isSelected ? 'bg-white dark:bg-slate-800 ring-2 ring-teal-500 border-teal-500' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700'}`;
+            row.className = `flex items-center justify-between p-4 rounded-2xl touch-target transition-all shadow-sm ${isSelected ? 'bg-white dark:bg-slate-800 ring-2 ring-teal-500 border-teal-500' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700'}`;
 
             if (selectionMode) {
                 row.innerHTML = `
@@ -2074,6 +2166,7 @@
         }
 
         function exitSelectionMode() {
+            if (!selectionMode) return;
             resetSelectionState();
             showFolderCards(currentFolderId);
         }
@@ -2192,6 +2285,8 @@
             const folder = getCurrentFolder();
             document.getElementById('current-folder-name').textContent = folder.name;
 
+            const prevScrollTop = document.querySelector('.scrollable-content')?.scrollTop || 0;
+
             const container = document.getElementById('main-content');
             container.innerHTML = `
                 <div class="scrollable-content px-1 pt-2">
@@ -2210,7 +2305,7 @@
                         <button onclick="toggleFolderHidden('${folder.id}', event)" class="text-sm font-medium text-amber-700 dark:text-amber-400 underline touch-target">Показать</button>
                     </div>
                     ` : ''}
-                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl overflow-hidden" id="card-list">
+                    <div class="space-y-2" id="card-list">
                         ${folder.cards.length === 0 ? `<div class="p-6 text-center text-slate-500 dark:text-slate-400">В этой колоде пока нет слов</div>` : ''}
                     </div>
                 </div>
@@ -2248,6 +2343,9 @@
                 const scrollable = document.querySelector('.scrollable-content');
                 if (scrollable) scrollable.style.paddingBottom = '';
             }
+
+            const scrollableAfter = document.querySelector('.scrollable-content');
+            if (scrollableAfter) scrollableAfter.scrollTop = prevScrollTop;
         }
 
         // Bottom sheet с операциями над выделенными карточками — вызывается
@@ -2481,6 +2579,11 @@
                                 <i class="fa-solid fa-rotate-left"></i> <span>Отменить</span>
                             </button>
                         </div>
+                    </div>
+                    <div class="flex justify-center mb-1">
+                        <button onclick="showRatingHelp()" class="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-x-1 px-3 py-2 touch-target">
+                            <i class="fa-solid fa-circle-question"></i> Как оценивать?
+                        </button>
                     </div>
                     <div class="rating-buttons">
                         <button onclick="rateCard(1)" class="rating-btn bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800">Снова<br><span class="text-xs opacity-75">${intervalPreview[0]}</span></button>
@@ -2724,6 +2827,20 @@
         }, 200));
 
         let isRatingCard = false;
+
+        function showRatingHelp() {
+            showAlertModal(
+                'Как оценивать карточку',
+                'Оценивайте не старание, а то, насколько легко вспомнилось слово:\n\n' +
+                '🔴 Снова — не вспомнили, карточка вернётся совсем скоро.\n' +
+                '🟠 Трудно — вспомнили, но с усилием или не сразу.\n' +
+                '🟢 Хорошо — вспомнили уверенно, с обычным усилием.\n' +
+                '🔵 Легко — вспомнили мгновенно, без малейшей заминки.\n\n' +
+                'Точный интервал до следующего показа виден прямо под каждой кнопкой — он меняется в зависимости от вашей истории ответов по этому слову.\n\n' +
+                'На новом слове «Хорошо» три раза подряд выводит его на повторение примерно через 3 дня, а «Легко» сразу пропускает шаги обучения и даёт интервал сразу около 16 дней — система как бы верит вам, что слово и так отлично знакомо.',
+                'Понятно'
+            );
+        }
 
         async function rateCard(grade) {
             if (isRatingCard) return;
@@ -3346,6 +3463,30 @@ Back: Красивый</pre>
                         </div>
                     </div>
                     <div class="panel">
+                        <div class="font-semibold text-base mb-3">Порядок изучения</div>
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" id="shuffle-toggle" ${shuffleEnabled ? 'checked' : ''} onchange="toggleShuffle(this.checked)" class="w-5 h-5 accent-teal-600">
+                            <span class="text-sm">Перемешивать карточки</span>
+                        </label>
+                        <div class="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                            Просроченные повторения всё равно показываются раньше остальных — перемешивается только порядок внутри одного дня.
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="font-semibold text-base mb-3">Голос озвучки</div>
+                        <label class="block text-sm mb-1">Английский — акцент</label>
+                        <select id="edge-voice-select" onchange="updatePreferredEdgeVoice(this.value)" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target mb-3">
+                            ${EDGE_ENGLISH_VOICES.map(v => `<option value="${v.id}" ${v.id === preferredEdgeVoice ? 'selected' : ''}>${v.label}</option>`).join('')}
+                        </select>
+                        <label class="block text-sm mb-1">Запасной голос устройства (если нет сети)</label>
+                        <select id="voice-select" onchange="updatePreferredVoice(this.value)" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
+                            <option value="">Загрузка голосов…</option>
+                        </select>
+                        <div class="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                            Основной голос — нейросетевой сервис Microsoft (естественное звучание, выбор акцента). Если он и Google недоступны (нет сети), используется голос устройства ниже.
+                        </div>
+                    </div>
+                    <div class="panel">
                         <div class="font-semibold text-base mb-3">Порог предложения архивации</div>
                         <label class="text-sm">Предлагать слово в архив, когда интервал повторения достигнет:</label>
                         <select id="archive-threshold-select" onchange="updateArchiveThreshold(this.value)" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
@@ -3393,6 +3534,35 @@ Back: Красивый</pre>
                     </div>
                 </div>
             `;
+            populateVoiceSelect();
+        }
+
+        async function toggleShuffle(enabled) {
+            shuffleEnabled = enabled;
+            await saveLimitSettings();
+        }
+
+        async function updatePreferredVoice(voiceURI) {
+            preferredVoiceURI = voiceURI || null;
+            await saveLimitSettings();
+        }
+
+        async function updatePreferredEdgeVoice(voiceId) {
+            preferredEdgeVoice = voiceId;
+            await saveLimitSettings();
+        }
+
+        async function populateVoiceSelect() {
+            const select = document.getElementById('voice-select');
+            if (!select) return;
+            const voices = await loadVoices();
+            const englishVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('en'));
+            if (englishVoices.length === 0) {
+                select.innerHTML = '<option value="">Голоса не найдены на устройстве</option>';
+                return;
+            }
+            select.innerHTML = '<option value="">Автоматически (рекомендуется)</option>' +
+                englishVoices.map(v => `<option value="${escapeHtml(v.voiceURI)}" ${v.voiceURI === preferredVoiceURI ? 'selected' : ''}>${escapeHtml(v.name)} (${escapeHtml(v.lang)})</option>`).join('');
         }
 
         async function toggleLimit(enabled) {
@@ -3544,14 +3714,91 @@ Back: Красивый</pre>
         }
 
         // ==================== TTS (ОЗВУЧКА) ====================
+        // ==================== EDGE NEURAL TTS ====================
+        const EDGE_TTS_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
+
+        async function generateSecMsGec() {
+            const WIN_EPOCH = 11644473600;
+            let ticks = Math.floor(Date.now() / 1000) + WIN_EPOCH;
+            ticks -= ticks % 300;
+            ticks *= 1e7;
+            const data = new TextEncoder().encode(`${ticks}${EDGE_TTS_TOKEN}`);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+        }
+
+        function edgeTtsSpeak(text, voiceName, locale) {
+            return new Promise(async (resolve, reject) => {
+                if (!window.crypto?.subtle || !window.WebSocket) {
+                    reject(new Error('Edge TTS недоступен в этом окружении'));
+                    return;
+                }
+                let ws;
+                const timer = setTimeout(() => {
+                    try { ws && ws.close(); } catch (e) {}
+                    reject(new Error('Edge TTS timeout'));
+                }, CONSTANTS.EDGE_TTS_TIMEOUT_MS);
+
+                try {
+                    const secMsGec = await generateSecMsGec();
+                    const connectionId = crypto.randomUUID().replace(/-/g, '');
+                    const wsUrl = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${EDGE_TTS_TOKEN}&Sec-MS-GEC=${secMsGec}&Sec-MS-GEC-Version=1-130.0.2849.68&ConnectionId=${connectionId}`;
+                    ws = new WebSocket(wsUrl);
+                    ws.binaryType = 'arraybuffer';
+                    const chunks = [];
+
+                    ws.onopen = () => {
+                        const now = new Date().toISOString();
+                        ws.send(`X-Timestamp:${now}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n` +
+                            `{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}`);
+
+                        const requestId = crypto.randomUUID().replace(/-/g, '');
+                        const ssml = `<speak version='1.0' xml:lang='${locale}'><voice name='${voiceName}'><prosody pitch='+0Hz' rate='+0%' volume='+0%'>${escapeHtml(text)}</prosody></voice></speak>`;
+                        ws.send(`X-RequestId:${requestId}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${now}\r\nPath:ssml\r\n\r\n${ssml}`);
+                    };
+
+                    ws.onmessage = (event) => {
+                        if (typeof event.data === 'string') {
+                            if (event.data.includes('Path:turn.end')) {
+                                clearTimeout(timer);
+                                ws.close();
+                                resolve(new Blob(chunks, { type: 'audio/mpeg' }));
+                            }
+                            return;
+                        }
+                        const buf = event.data;
+                        const headerLength = new DataView(buf).getUint16(0);
+                        const headerText = new TextDecoder().decode(buf.slice(2, 2 + headerLength));
+                        if (headerText.includes('Path:audio')) {
+                            chunks.push(new Uint8Array(buf.slice(2 + headerLength)));
+                        }
+                    };
+
+                    ws.onerror = () => { clearTimeout(timer); reject(new Error('Edge TTS WebSocket error')); };
+                    ws.onclose = () => { clearTimeout(timer); if (chunks.length === 0) reject(new Error('Edge TTS закрылся без аудио')); };
+                } catch (e) {
+                    clearTimeout(timer);
+                    reject(e);
+                }
+            });
+        }
+
+        function playCachedBlob(blob) {
+            const url = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            audio.play();
+            audio.onended = () => URL.revokeObjectURL(url);
+        }
+
         function detectLanguage(text) {
             if (/[а-яё]/i.test(text)) return 'ru';
             return 'en';
         }
 
-        // Новая версия speakWord: русский — сразу через speechSynthesis (мгновенно,
-        // без похода в сеть), английский — через Google TTS с коротким таймаутом
-        // и падением на speechSynthesis при неудаче. Кеширование Blob + удаление эмодзи.
+        // Цепочка провайдеров озвучки: Edge Neural TTS (лучшее качество, выбор
+        // акцента) → Google TTS (резерв) → локальный speechSynthesis (гарантированный
+        // офлайн-фолбэк). Каждый следующий пробуется только если предыдущий упал
+        // или не ответил за отведённое время.
         async function speakWord(text) {
             if (!text) return;
             text = removeEmojis(text);
@@ -3559,23 +3806,21 @@ Back: Красивый</pre>
 
             const lang = detectLanguage(text);
             const langCode = lang === 'en' ? 'en-US' : 'ru-RU';
-
-            // Для русского Google TTS не даёт заметного выигрыша в качестве, а сеть
-            // добавляет задержку — поэтому сразу используем локальный speechSynthesis.
-            if (lang === 'ru') {
-                await fallbackSpeak(text, lang);
-                return;
-            }
-
+            const edgeVoice = lang === 'en' ? (preferredEdgeVoice || 'en-US-AriaNeural') : 'ru-RU-SvetlanaNeural';
             const cacheKey = `${lang}:${text}`;
 
             if (audioBlobCache.has(cacheKey)) {
-                const blob = audioBlobCache.get(cacheKey);
-                const url = URL.createObjectURL(blob);
-                const audio = new Audio(url);
-                audio.play();
-                audio.onended = () => URL.revokeObjectURL(url);
+                playCachedBlob(audioBlobCache.get(cacheKey));
                 return;
+            }
+
+            try {
+                const blob = await edgeTtsSpeak(text, edgeVoice, langCode);
+                audioBlobCache.set(cacheKey, blob);
+                playCachedBlob(blob);
+                return;
+            } catch (error) {
+                console.warn('Edge TTS не сработал, пробуем Google TTS:', error.message);
             }
 
             try {
@@ -3590,17 +3835,10 @@ Back: Красивый</pre>
                     signal: controller.signal
                 });
                 clearTimeout(timeoutId);
-                if (response.ok) {
-                    const blob = await response.blob();
-                    audioBlobCache.set(cacheKey, blob);
-                    const audioUrl = URL.createObjectURL(blob);
-                    const audio = new Audio(audioUrl);
-                    audio.play();
-                    audio.onended = () => URL.revokeObjectURL(audioUrl);
-                    return;
-                } else {
-                    throw new Error(`Google TTS ответил с ошибкой ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`Google TTS ответил с ошибкой ${response.status}`);
+                const blob = await response.blob();
+                audioBlobCache.set(cacheKey, blob);
+                playCachedBlob(blob);
             } catch (error) {
                 console.warn('Google TTS не сработал, переключаемся на speechSynthesis:', error.message);
                 await fallbackSpeak(text, lang);
@@ -3613,9 +3851,18 @@ Back: Красивый</pre>
         function pickBestVoice(voices, langCode, lang) {
             if (!voices || voices.length === 0) return null;
 
+            if (lang === 'en' && preferredVoiceURI) {
+                const preferred = voices.find(v => v.voiceURI === preferredVoiceURI);
+                if (preferred) return preferred;
+            }
+
             const exact = voices.filter(v => v.lang === langCode);
             const partial = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith(lang));
-            const pool = exact.length > 0 ? exact : (partial.length > 0 ? partial : voices);
+            const pool = exact.length > 0 ? exact : partial;
+            // Если голосов нужного языка нет вообще — не подсовываем голос
+            // чужого языка (именно так на ПК без английских голосов слово
+            // "table" читалось русским голосом).
+            if (pool.length === 0) return null;
 
             const scored = pool.map(v => {
                 const name = (v.name || '').toLowerCase();
@@ -3857,6 +4104,16 @@ Back: Красивый</pre>
 
         window.addEventListener('beforeunload', flushPendingChanges);
         window.addEventListener('pagehide', flushPendingChanges);
+
+        // Отключаем зум по двойному тапу (Safari iOS), сохраняя pinch-to-zoom.
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, { passive: false });
 
         window.onload = init;
     </script>
