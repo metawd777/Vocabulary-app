@@ -1324,7 +1324,9 @@
             let cardsWithStabilityOver100 = 0;
             let maxRealizedInterval = 0;
 
-            folders.forEach(f => f.cards.forEach(c => {
+            folders.forEach(f => {
+                if (f.system) return; // архивные слова не в "активной" статистике — masteredCount считается отдельно
+                f.cards.forEach(c => {
                 total++;
                 if (c.state === 'learning') statLearning++;
                 else if (c.state === 'review') statReview++;
@@ -1340,7 +1342,8 @@
                 if (c.maxRealizedIntervalDays && c.maxRealizedIntervalDays > maxRealizedInterval) {
                     maxRealizedInterval = c.maxRealizedIntervalDays;
                 }
-            }));
+                });
+            });
             const percentCorrect = totalReps > 0 ? Math.max(0, Math.round((1 - totalLapses / totalReps) * 100)) : null;
             const avgStability = stabilityCount > 0 ? (stabilitySum / stabilityCount) : null;
             const learnedCount = statReview + statRelearning;
@@ -2948,14 +2951,30 @@
             // добавит её заново при следующей успешной оценке в этой сессии.
             sessionStableCandidates = sessionStableCandidates.filter(c => c.id !== savedCard.id);
 
-            if (realCard && folder) {
+            if (realCard && folder && !folder.system) {
+                // Обычный случай: карточка всё ещё в своей папке.
+                Object.keys(realCard).forEach(k => delete realCard[k]);
                 Object.assign(realCard, savedCard);
+            } else if (realCard && folder && folder.system) {
+                // Карточка успела уйти в архив между оценкой и отменой (отдельное
+                // действие пользователя "Отправить в архив") — возвращаем её в
+                // исходную папку. card.folderId проставляется в startStudy() для
+                // сессии "обучение всех колод"; для одиночной папки берём текущую.
+                folder.cards = folder.cards.filter(c => c.id !== savedCard.id);
+                const targetFolder = folders.find(f => f.id === savedCard.folderId) || getCurrentFolder();
+                Object.keys(realCard).forEach(k => delete realCard[k]);
+                Object.assign(realCard, savedCard);
+                targetFolder.cards.push(realCard);
             } else {
+                // Защитный запасной путь на случай изменений в структуре данных —
+                // findCardAndFolderById уже покрывает все папки включая архив,
+                // так что в норме сюда не попадаем.
                 const mastered = getMasteredFolder();
                 const masteredCard = mastered.cards.find(c => c.id === savedCard.id);
                 if (masteredCard) {
                     mastered.cards = mastered.cards.filter(c => c.id !== savedCard.id);
                     const targetFolder = folders.find(f => f.id === savedCard.folderId) || getCurrentFolder();
+                    Object.keys(masteredCard).forEach(k => delete masteredCard[k]);
                     Object.assign(masteredCard, savedCard);
                     targetFolder.cards.push(masteredCard);
                 }
@@ -3003,7 +3022,10 @@
                 const stillInFolder = folder.cards.find(c => c.id === editingCardId);
                 if (dueIndex !== -1) {
                     if (stillInFolder) {
-                        Object.assign(dueCards[dueIndex], stillInFolder);
+                        if (dueCards[dueIndex] !== stillInFolder) {
+                            Object.keys(dueCards[dueIndex]).forEach(k => delete dueCards[dueIndex][k]);
+                            Object.assign(dueCards[dueIndex], stillInFolder);
+                        }
                     } else {
                         dueCards.splice(dueIndex, 1);
                         if (dueIndex < currentCardIndex) currentCardIndex--;
@@ -3436,7 +3458,7 @@ Back: Красивый</pre>
                         { confirmLabel: 'Сбросить', cancelLabel: 'Оставить как есть' }
                     );
                     if (resetStatsToo) {
-                        stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0 };
+                        stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 } };
                         await saveStats();
                     }
                 } else {
@@ -3577,6 +3599,7 @@ Back: Красивый</pre>
 
         async function updateArchiveThreshold(value) {
             const num = parseInt(value);
+            if (isNaN(num) || num < 0) return; // защита про запас — сейчас недостижимо через фиксированный select
             archiveThresholdDays = num; // 0 означает "никогда не предлагать" (см. select ниже)
             await saveLimitSettings();
         }
@@ -3596,7 +3619,7 @@ Back: Красивый</pre>
         async function resetAllStats() {
             const ok = await showConfirmModal('Сбросить статистику', 'Сбросить всю статистику и достижения?', { confirmLabel: 'Сбросить' });
             if (!ok) return;
-            stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0 };
+            stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 } };
             await saveStats();
             if (document.getElementById('current-folder-name').textContent === 'Статистика') {
                 showStatsView();
