@@ -498,10 +498,10 @@
         let dailyLimitEnabled = false;
         let dailyLimitCount = 20;
         let dailyReviewLimitEnabled = false;
-        let dailyReviewLimitCount = 200;
+        let dailyReviewLimitCount = 100;
         let archiveThresholdDays = 30;
         let shuffleEnabled = true;
-        let cardOrderMode = 'mixed';
+        let cardOrderMode = 'reviews_first';
         const LEECH_THRESHOLD = 8; // как в Anki: 8+ провалов — сигнал переформулировать карточку
         let sessionStableCandidates = [];
         let statsCalendarOffset = 0; // 0 = текущий месяц, -1 = предыдущий и т.д.
@@ -817,10 +817,10 @@
                     dailyLimitEnabled = !!stored.dailyLimitEnabled;
                     dailyLimitCount = parseInt(stored.dailyLimitCount) || 20;
                     dailyReviewLimitEnabled = !!stored.dailyReviewLimitEnabled;
-                    dailyReviewLimitCount = parseInt(stored.dailyReviewLimitCount) || 200;
+                    dailyReviewLimitCount = parseInt(stored.dailyReviewLimitCount) || 100;
                     archiveThresholdDays = stored.archiveThresholdDays !== undefined ? Number(stored.archiveThresholdDays) : 30;
                     shuffleEnabled = stored.shuffleEnabled !== undefined ? !!stored.shuffleEnabled : true;
-                    cardOrderMode = stored.cardOrderMode || 'mixed';
+                    cardOrderMode = stored.cardOrderMode || 'reviews_first';
                     return;
                 }
             } catch (e) {
@@ -3609,13 +3609,6 @@ Back: Красивый</pre>
                 <div class="scrollable-content px-1 pt-2 pb-4">
                     <h2 class="text-xl font-semibold mb-3">Настройки</h2>
                     <div class="panel">
-                        <div class="font-semibold text-base mb-3">Колоды</div>
-                        <button onclick="createFolder()" class="menu-item"><i class="fa-solid fa-plus w-5 text-teal-600"></i> <span>Создать колоду</span></button>
-                        <button onclick="showDeleteFolderModal()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-x-3 text-red-600 text-base touch-target">
-                            <i class="fa-solid fa-trash w-5"></i> <span>Удалить колоду</span>
-                        </button>
-                    </div>
-                    <div class="panel">
                         <div class="font-semibold text-base mb-3">Лимит новых слов</div>
                         <label class="flex items-center gap-3 cursor-pointer mb-2">
                             <input type="checkbox" id="limit-toggle" ${dailyLimitEnabled ? 'checked' : ''} onchange="toggleLimit(this.checked)" class="w-5 h-5 accent-teal-600">
@@ -3829,42 +3822,6 @@ Back: Красивый</pre>
             await saveData();
             await showAlertModal('Готово', 'Прогресс всех колод сброшен');
             showFoldersView();
-        }
-
-        async function showDeleteFolderModal() {
-            const deletable = folders.filter(f => !f.system);
-            if (deletable.length === 0) {
-                await showAlertModal('Нет колод', 'Нет колод, которые можно удалить.');
-                return;
-            }
-            if (deletable.length === 1) {
-                const ok = await showConfirmModal('Удалить колоду', `Удалить колоду «${deletable[0].name}»?`, { confirmLabel: 'Удалить' });
-                if (ok) performDeleteFolder(deletable[0].id);
-                return;
-            }
-            const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]';
-            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-            modal.innerHTML = `
-                <div onclick="event.stopImmediatePropagation()" class="modal-panel-sm">
-                    <div class="font-semibold text-xl mb-4">Выберите колоду для удаления</div>
-                    ${deletable.map(f => `
-                        <button onclick="confirmDeleteFolder('${f.id}'); this.closest('.fixed').remove()" class="w-full text-left px-4 py-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 flex justify-between mb-1 text-base touch-target">
-                            <span>${escapeHtml(f.name)}</span>
-                            <span class="text-xs text-slate-400">${f.cards.length} слов</span>
-                        </button>
-                    `).join('')}
-                    <button onclick="this.closest('.fixed').remove()" class="btn-cancel-block">Отмена</button>
-                </div>
-            `;
-            document.body.appendChild(modal);
-        }
-
-        async function confirmDeleteFolder(folderId) {
-            const folder = folders.find(f => f.id === folderId);
-            const ok = await showConfirmModal('Удалить колоду', `Удалить колоду${folder ? ` «${folder.name}»` : ''}?`, { confirmLabel: 'Удалить' });
-            if (!ok) return;
-            await performDeleteFolder(folderId);
         }
 
         async function performDeleteFolder(folderId) {
