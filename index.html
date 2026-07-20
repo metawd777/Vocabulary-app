@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Vocabulary">
@@ -91,8 +91,8 @@
     </style>
     <style>
         /* Базовые стили – сохранены из исходной финальной версии */
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-        input, textarea { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+        input, textarea { -webkit-user-select: text; user-select: text; -webkit-touch-callout: none; }
         html, body { margin:0; padding:0; height:100%; overflow:hidden; font-family: system-ui, -apple-system, sans-serif; }
         body { background:#f1f5f9; color:#0f172a; display:flex; flex-direction:column; }
         .dark body { background:#0f172a; color:#f1f5f9; }
@@ -492,13 +492,17 @@
         let editingCardId = null;
         let viewingCardId = null;
         let editContext = 'folder';
-        let stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 } };
+        let stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 }, reviewsShownToday: { date: null, count: 0 } };
         let lastReviewedCard = null;
         let undoStack = [];
         let dailyLimitEnabled = false;
         let dailyLimitCount = 20;
+        let dailyReviewLimitEnabled = false;
+        let dailyReviewLimitCount = 200;
         let archiveThresholdDays = 30;
         let shuffleEnabled = true;
+        let cardOrderMode = 'mixed';
+        const LEECH_THRESHOLD = 8; // как в Anki: 8+ провалов — сигнал переформулировать карточку
         let sessionStableCandidates = [];
         let statsCalendarOffset = 0; // 0 = текущий месяц, -1 = предыдущий и т.д.
 
@@ -797,6 +801,7 @@
                         totalFlips: stored.totalFlips || 0,
                         totalImages: stored.totalImages || 0,
                         newShownToday: stored.newShownToday || { date: null, count: 0 },
+                        reviewsShownToday: stored.reviewsShownToday || { date: null, count: 0 },
                         longestStreak: stored.longestStreak || 0
                     };
                 }
@@ -811,8 +816,11 @@
                 if (stored && typeof stored === 'object') {
                     dailyLimitEnabled = !!stored.dailyLimitEnabled;
                     dailyLimitCount = parseInt(stored.dailyLimitCount) || 20;
+                    dailyReviewLimitEnabled = !!stored.dailyReviewLimitEnabled;
+                    dailyReviewLimitCount = parseInt(stored.dailyReviewLimitCount) || 200;
                     archiveThresholdDays = stored.archiveThresholdDays !== undefined ? Number(stored.archiveThresholdDays) : 30;
                     shuffleEnabled = stored.shuffleEnabled !== undefined ? !!stored.shuffleEnabled : true;
+                    cardOrderMode = stored.cardOrderMode || 'mixed';
                     return;
                 }
             } catch (e) {
@@ -831,7 +839,7 @@
 
         async function saveLimitSettings() {
             try {
-                await localforage.setItem('limitSettings', { dailyLimitEnabled, dailyLimitCount, archiveThresholdDays, shuffleEnabled });
+                await localforage.setItem('limitSettings', { dailyLimitEnabled, dailyLimitCount, dailyReviewLimitEnabled, dailyReviewLimitCount, archiveThresholdDays, shuffleEnabled, cardOrderMode });
             } catch (e) {
                 console.error('Ошибка сохранения настроек лимита:', e);
             }
@@ -1055,6 +1063,7 @@
         async function updateCardAfterReview(card, grade) {
             const now = new Date();
             if (!card.state) card.state = 'new';
+            const wasNew = card.state === 'new'; // фиксируем ДО мутации — нужно для честного учёта дневного лимита
             if (typeof card.reps === 'undefined') card.reps = 0;
             if (typeof card.lapses === 'undefined') card.lapses = 0;
             card.reps++;
@@ -1140,6 +1149,29 @@
             }
             card.last_review = now.toISOString();
             card.lastGrade = grade;
+
+            // Слово реально "взято в работу" только сейчас, когда ему поставили
+            // оценку — не в момент, когда оно просто попало в очередь показа.
+            // Если сессию закрыли, не дойдя до слова, оно не должно сгорать
+            // из дневного лимита впустую.
+            if (wasNew && dailyLimitEnabled) {
+                const todayKey = localDateKey(getEffectiveDate(now));
+                if (!stats.newShownToday || stats.newShownToday.date !== todayKey) {
+                    stats.newShownToday = { date: todayKey, count: 0 };
+                }
+                stats.newShownToday.count++;
+                await saveStats();
+            }
+
+            if (dailyReviewLimitEnabled) {
+                const todayKey = localDateKey(getEffectiveDate(now));
+                if (!stats.reviewsShownToday || stats.reviewsShownToday.date !== todayKey) {
+                    stats.reviewsShownToday = { date: todayKey, count: 0 };
+                }
+                stats.reviewsShownToday.count++;
+                await saveStats();
+            }
+
             await saveData();
         }
 
@@ -1169,20 +1201,12 @@
             return a;
         }
 
-        function getDueCardsFromArray(cards) {
-            const now = new Date();
-            const due = cards.filter(card => {
-                if (!card.nextReviewDate) return true;
-                const d = new Date(card.nextReviewDate);
-                return isNaN(d.getTime()) || d <= now;
-            });
-
+        function orderCardGroup(group) {
             if (!shuffleEnabled) {
-                return due.sort((a, b) => new Date(a.nextReviewDate || 0) - new Date(b.nextReviewDate || 0));
+                return group.sort((a, b) => new Date(a.nextReviewDate || 0) - new Date(b.nextReviewDate || 0));
             }
-
             const buckets = new Map();
-            due.forEach(card => {
+            group.forEach(card => {
                 const key = card.nextReviewDate ? localDateKey(new Date(card.nextReviewDate)) : '0';
                 if (!buckets.has(key)) buckets.set(key, []);
                 buckets.get(key).push(card);
@@ -1194,6 +1218,22 @@
             return result;
         }
 
+        function getDueCardsFromArray(cards) {
+            const now = new Date();
+            const due = cards.filter(card => {
+                if (!card.nextReviewDate) return true;
+                const d = new Date(card.nextReviewDate);
+                return isNaN(d.getTime()) || d <= now;
+            });
+
+            if (cardOrderMode === 'mixed') {
+                return orderCardGroup(due);
+            }
+            const newGroup = orderCardGroup(due.filter(c => c.state === 'new'));
+            const reviewGroup = orderCardGroup(due.filter(c => c.state !== 'new'));
+            return cardOrderMode === 'reviews_first' ? reviewGroup.concat(newGroup) : newGroup.concat(reviewGroup);
+        }
+
         // Лимит применяется ТОЛЬКО к новым (ещё не изучавшимся) карточкам — это
         // единственное, для чего дневной лимит научно оправдан (защита от перегрузки
         // рабочей памяти и интерференции при кодировании новой информации). Карточки
@@ -1201,26 +1241,32 @@
         // лучше ограничивать временем самой сессии, а не искусственным счётчиком,
         // иначе при большом бэклоге лимит просто блокирует прогресс по уже знакомым словам.
         function applyDailyLimit(cards) {
-            if (!dailyLimitEnabled) return cards;
-            const todayKey = localDateKey(new Date());
-            if (!stats.newShownToday || stats.newShownToday.date !== todayKey) {
-                stats.newShownToday = { date: todayKey, count: 0 };
-            }
-            let newCount = stats.newShownToday.count;
-            let addedThisCall = 0;
-            const result = [];
-            for (const card of cards) {
-                if (card.state === 'new') {
-                    if (newCount >= dailyLimitCount) continue;
-                    newCount++;
-                    addedThisCall++;
+            let result = cards;
+
+            if (dailyLimitEnabled) {
+                const todayKey = localDateKey(getEffectiveDate());
+                if (!stats.newShownToday || stats.newShownToday.date !== todayKey) {
+                    stats.newShownToday = { date: todayKey, count: 0 };
                 }
-                result.push(card);
+                const remaining = Math.max(0, dailyLimitCount - stats.newShownToday.count);
+                let used = 0;
+                result = result.filter(card => {
+                    if (card.state !== 'new') return true;
+                    if (used >= remaining) return false;
+                    used++;
+                    return true;
+                });
             }
-            if (addedThisCall > 0) {
-                stats.newShownToday.count = newCount;
-                saveStats();
+
+            if (dailyReviewLimitEnabled) {
+                const todayKey = localDateKey(getEffectiveDate());
+                if (!stats.reviewsShownToday || stats.reviewsShownToday.date !== todayKey) {
+                    stats.reviewsShownToday = { date: todayKey, count: 0 };
+                }
+                const remaining = Math.max(0, dailyReviewLimitCount - stats.reviewsShownToday.count);
+                result = result.slice(0, remaining);
             }
+
             return result;
         }
 
@@ -1240,6 +1286,16 @@
         }
 
         // ==================== СТАТИСТИКА И ДОСТИЖЕНИЯ ====================
+        // Anki делает так же: "логический день" сдвинут на несколько часов вперёд
+        // полуночи, чтобы поздняя ночная сессия перед сном не считалась новым днём
+        // и не сбрасывала дневной лимит/серию раньше времени. Используется ТОЛЬКО
+        // для учёта/статистики — реальное планирование интервалов FSRS всегда идёт
+        // по настоящему времени (getDueCardsFromArray, getTimeUntilNextReview).
+        const DAY_ROLLOVER_HOUR = 4;
+        function getEffectiveDate(date = new Date()) {
+            return new Date(date.getTime() - DAY_ROLLOVER_HOUR * 3600000);
+        }
+
         function localDateKey(date) {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -1248,7 +1304,7 @@
         }
 
         async function recordStudyActivity() {
-            const key = localDateKey(new Date());
+            const key = localDateKey(getEffectiveDate());
             if (!stats.studyDates.includes(key)) {
                 stats.studyDates.push(key);
                 const streakNow = currentStreak();
@@ -1264,7 +1320,7 @@
             const daySet = new Set(stats.studyDates);
             const prevCalendarDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1);
             let streak = 0;
-            let cursor = new Date();
+            let cursor = getEffectiveDate();
             if (!daySet.has(localDateKey(cursor))) {
                 cursor = prevCalendarDay(cursor);
             }
@@ -1276,12 +1332,12 @@
         }
 
         function getTodayStats() {
-            const key = localDateKey(new Date());
+            const key = localDateKey(getEffectiveDate());
             return stats.dailyStats?.[key] || null;
         }
 
         async function recordReviewOutcome(grade) {
-            const key = localDateKey(new Date());
+            const key = localDateKey(getEffectiveDate());
             if (!stats.dailyStats) stats.dailyStats = {};
             if (!stats.dailyStats[key]) {
                 stats.dailyStats[key] = { total: 0, correct: 0, grades: [], usedAllGrades: false };
@@ -1323,6 +1379,7 @@
             let maxStability = 0;
             let cardsWithStabilityOver100 = 0;
             let maxRealizedInterval = 0;
+            let leechCount = 0;
 
             folders.forEach(f => {
                 if (f.system) return; // архивные слова не в "активной" статистике — masteredCount считается отдельно
@@ -1334,6 +1391,7 @@
                 else statNew++;
                 totalReps += c.reps || 0;
                 totalLapses += c.lapses || 0;
+                if ((c.lapses || 0) >= LEECH_THRESHOLD) leechCount++;
                 if (typeof c.stability === 'number') {
                     stabilitySum += c.stability; stabilityCount++;
                     if (c.stability > maxStability) maxStability = c.stability;
@@ -1351,7 +1409,28 @@
             const masteredCount = (folders.find(f => f.system) || { cards: [] }).cards.length;
             const maxInterval = Math.round(maxRealizedInterval);
 
-            return { total, statNew, statLearning, statReview, statRelearning, totalReps, totalLapses, percentCorrect, avgStability, learnedCount, totalImages, totalFlips, maxConsecutiveCorrect, todayStats, masteredCount, maxInterval, cardsWithStabilityOver100 };
+            return { total, statNew, statLearning, statReview, statRelearning, totalReps, totalLapses, percentCorrect, avgStability, learnedCount, totalImages, totalFlips, maxConsecutiveCorrect, todayStats, masteredCount, maxInterval, cardsWithStabilityOver100, leechCount };
+        }
+
+        function showLeechList() {
+            const leeches = [];
+            folders.forEach(f => {
+                if (f.system) return;
+                f.cards.forEach(c => {
+                    if ((c.lapses || 0) >= LEECH_THRESHOLD) leeches.push(c);
+                });
+            });
+            if (leeches.length === 0) {
+                showAlertModal('Трудные слова', 'Пока нет слов с 8+ провалами — отлично!', 'Понятно');
+                return;
+            }
+            leeches.sort((a, b) => (b.lapses || 0) - (a.lapses || 0));
+            const lines = leeches.map(c => `${c.english} — ${c.russian} (провалов: ${c.lapses})`).join('\n');
+            showAlertModal(
+                'Трудные слова',
+                'Эти слова алгоритм показывает снова и снова, а вы всё равно их забываете — обычно дело не в памяти, а в самой карточке. Попробуйте переформулировать, разбить на два более простых слова или добавить картинку-подсказку:\n\n' + lines,
+                'Понятно'
+            );
         }
 
         // Сколько дней прошло с ПРЕДЫДУЩЕГО (не сегодняшнего) дня занятий —
@@ -1360,7 +1439,7 @@
         // поэтому сегодняшний день явно исключается из поиска.
         function daysSincePreviousStudy() {
             if (!stats.studyDates || stats.studyDates.length < 2) return 0;
-            const todayKey = localDateKey(new Date());
+            const todayKey = localDateKey(getEffectiveDate());
             const prevDates = [...new Set(stats.studyDates)].filter(d => d !== todayKey).sort();
             if (prevDates.length === 0) return 0;
             const lastPrev = new Date(prevDates[prevDates.length - 1]);
@@ -1452,7 +1531,7 @@
 
         function buildActivityCalendar(offset) {
             const daySet = new Set(stats.studyDates);
-            const now = new Date();
+            const now = getEffectiveDate();
             const viewDate = new Date(now.getFullYear(), now.getMonth() + offset, 1);
             const year = viewDate.getFullYear();
             const month = viewDate.getMonth();
@@ -1584,6 +1663,7 @@
                             <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Изучаются</span><span class="font-medium">${g.statLearning}</span></div>
                             <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">На повторении</span><span class="font-medium">${g.statReview}</span></div>
                             <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400 border-b border-dotted border-slate-400 dark:border-slate-500" onclick="showAlertModal('Переучиваются', 'Это слова, которые вы уже знали, но недавно ответили на них «Снова» — забыли. Они возвращаются на короткие интервалы, пока не закрепятся заново, а затем продолжают обычный график повторений.', 'Понятно')">Переучиваются ⓘ</span><span class="font-medium">${g.statRelearning}</span></div>
+                            <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400 border-b border-dotted border-slate-400 dark:border-slate-500" onclick="showLeechList()">Трудные слова ⓘ</span><span class="font-medium">${g.leechCount}</span></div>
                         </div>
                     </div>
                     ${buildActivityCalendar(statsCalendarOffset)}
@@ -2155,7 +2235,7 @@
             } else {
                 row.innerHTML = `
                     <div class="flex-1 cursor-pointer" onclick="viewCard('${card.id}')">
-                        <div class="font-medium">${escapeHtml(card.english)}</div>
+                        <div class="font-medium">${escapeHtml(card.english)}${(card.lapses || 0) >= LEECH_THRESHOLD ? ' <span title="Трудное слово — часто забывается, стоит переформулировать">⚠️</span>' : ''}</div>
                         <div class="text-sm text-slate-500 dark:text-slate-400">${escapeHtml(card.russian)}</div>
                     </div>
                     <div class="flex items-center gap-x-2">
@@ -2515,14 +2595,45 @@
         function showEmptyStudyState(sourceName, cardsInScope) {
             const container = document.getElementById('main-content');
             if (!container) return;
-            const nextReview = cardsInScope ? getTimeUntilNextReview(cardsInScope) : null;
+
+            const dueNow = cardsInScope ? getDueCardsFromArray(cardsInScope) : [];
+            const hasDueNew = dueNow.some(c => c.state === 'new');
+            const todayKeyEff = localDateKey(getEffectiveDate());
+            const newRemaining = dailyLimitEnabled
+                ? Math.max(0, dailyLimitCount - (stats.newShownToday && stats.newShownToday.date === todayKeyEff ? stats.newShownToday.count : 0))
+                : Infinity;
+            const reviewRemaining = dailyReviewLimitEnabled
+                ? Math.max(0, dailyReviewLimitCount - (stats.reviewsShownToday && stats.reviewsShownToday.date === todayKeyEff ? stats.reviewsShownToday.count : 0))
+                : Infinity;
+            const newLimitIsBlocker = dailyLimitEnabled && newRemaining <= 0 && hasDueNew;
+            const reviewLimitIsBlocker = dailyReviewLimitEnabled && reviewRemaining <= 0 && dueNow.length > 0;
+
+            // "Следующее повторение" имеет смысл только для карточек с реальным
+            // расписанием — у новых слов его нет (они доступны сразу же, просто
+            // придержаны лимитом), поэтому их в этот расчёт не берём — иначе
+            // экран всегда врал бы "сейчас", даже когда лимит исчерпан до завтра.
+            const scheduledCards = cardsInScope ? cardsInScope.filter(c => c.state !== 'new') : null;
+            const nextReview = scheduledCards && scheduledCards.length > 0 ? getTimeUntilNextReview(scheduledCards) : null;
+
+            let message;
+            if (newLimitIsBlocker && reviewLimitIsBlocker) {
+                message = `В «${escapeHtml(sourceName)}» на сегодня исчерпаны оба лимита — и по новым словам, и по общему числу карточек.<br>Всё обновится завтра.`;
+            } else if (reviewLimitIsBlocker) {
+                message = `В «${escapeHtml(sourceName)}» на сегодня исчерпан общий лимит карточек в день.<br>Обновится завтра.`;
+            } else if (newLimitIsBlocker) {
+                message = `В «${escapeHtml(sourceName)}» дневной лимит новых слов на сегодня исчерпан.` +
+                    (nextReview ? `<br>Ближайшее повторение остальных слов — ${nextReview.text}.` : '<br>Новые слова станут доступны завтра.');
+            } else {
+                message = `В «${escapeHtml(sourceName)}» нет карточек для повторения на сегодня.` +
+                    (nextReview ? `<br>Следующее повторение — ${nextReview.text}.` : '');
+            }
+
             container.innerHTML = `
                 <div class="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
                     <i class="fa-solid fa-check-circle text-7xl text-teal-500 mb-6"></i>
                     <div class="text-2xl font-semibold mb-3">Отлично!</div>
                     <div class="text-slate-500 dark:text-slate-400 max-w-xs mb-8">
-                        В «${escapeHtml(sourceName)}» нет карточек для повторения на сегодня.
-                        ${nextReview ? `<br>Следующее повторение — ${nextReview.text}.` : ''}
+                        ${message}
                     </div>
                     <button onclick="showFoldersView()" class="px-8 py-3.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white rounded-2xl font-medium text-base touch-target transition">
                         Вернуться к колодам
@@ -3458,7 +3569,7 @@ Back: Красивый</pre>
                         { confirmLabel: 'Сбросить', cancelLabel: 'Оставить как есть' }
                     );
                     if (resetStatsToo) {
-                        stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 } };
+                        stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 }, reviewsShownToday: { date: null, count: 0 } };
                         await saveStats();
                     }
                 } else {
@@ -3515,7 +3626,21 @@ Back: Красивый</pre>
                             <input type="number" id="limit-count" value="${dailyLimitCount}" min="1" max="999" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" onchange="updateLimitCount(this.value)">
                         </div>
                         <div class="text-xs text-slate-400 dark:text-slate-500 mt-2">
-                            Ограничивает только новые слова — карточки на повторение показываются без лимита по числу. Для них лучше ориентироваться на время сессии (30–50 минут), а не на жёсткий счётчик.
+                            Ограничивает только новые слова. Карточки на повторение сюда не входят — для них есть отдельный лимит ниже.
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="font-semibold text-base mb-3">Лимит повторений в день</div>
+                        <label class="flex items-center gap-3 cursor-pointer mb-2">
+                            <input type="checkbox" id="review-limit-toggle" ${dailyReviewLimitEnabled ? 'checked' : ''} onchange="toggleReviewLimit(this.checked)" class="w-5 h-5 accent-teal-600">
+                            <span class="text-sm">Ограничивать общее число карточек в день</span>
+                        </label>
+                        <div id="review-limit-count-wrapper" class="${dailyReviewLimitEnabled ? '' : 'hidden'} mt-2">
+                            <label class="text-sm">Максимум карточек (любых) в день:</label>
+                            <input type="number" id="review-limit-count" value="${dailyReviewLimitCount}" min="1" max="9999" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" onchange="updateReviewLimitCount(this.value)">
+                        </div>
+                        <div class="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                            Независимо от лимита новых слов — считает вообще все показанные и оценённые карточки за день, включая повторения. Полезно, если хочется ограничить общее время на занятия, а не только приток новых слов.
                         </div>
                     </div>
                     <div class="panel">
@@ -3524,8 +3649,17 @@ Back: Красивый</pre>
                             <input type="checkbox" id="shuffle-toggle" ${shuffleEnabled ? 'checked' : ''} onchange="toggleShuffle(this.checked)" class="w-5 h-5 accent-teal-600">
                             <span class="text-sm">Перемешивать карточки</span>
                         </label>
-                        <div class="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                        <div class="text-xs text-slate-400 dark:text-slate-500 mt-2 mb-3">
                             Просроченные повторения всё равно показываются раньше остальных — перемешивается только порядок внутри одного дня.
+                        </div>
+                        <label class="text-sm block mb-1">Что показывать сначала:</label>
+                        <select id="card-order-select" onchange="updateCardOrderMode(this.value)" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
+                            <option value="mixed" ${cardOrderMode === 'mixed' ? 'selected' : ''}>Вперемешку</option>
+                            <option value="reviews_first" ${cardOrderMode === 'reviews_first' ? 'selected' : ''}>Сначала повторения, потом новые</option>
+                            <option value="new_first" ${cardOrderMode === 'new_first' ? 'selected' : ''}>Сначала новые, потом повторения</option>
+                        </select>
+                        <div class="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                            «Сначала повторения» — рекомендация из мира интервальных повторений: не наращивать новое поверх ещё не закреплённого.
                         </div>
                     </div>
                     <div class="panel">
@@ -3583,6 +3717,11 @@ Back: Красивый</pre>
             await saveLimitSettings();
         }
 
+        async function updateCardOrderMode(value) {
+            cardOrderMode = value;
+            await saveLimitSettings();
+        }
+
         async function toggleLimit(enabled) {
             dailyLimitEnabled = enabled;
             await saveLimitSettings();
@@ -3593,6 +3732,20 @@ Back: Красивый</pre>
             const num = parseInt(value);
             if (!isNaN(num) && num > 0) {
                 dailyLimitCount = num;
+                await saveLimitSettings();
+            }
+        }
+
+        async function toggleReviewLimit(enabled) {
+            dailyReviewLimitEnabled = enabled;
+            await saveLimitSettings();
+            document.getElementById('review-limit-count-wrapper').classList.toggle('hidden', !enabled);
+        }
+
+        async function updateReviewLimitCount(value) {
+            const num = parseInt(value);
+            if (!isNaN(num) && num > 0) {
+                dailyReviewLimitCount = num;
                 await saveLimitSettings();
             }
         }
@@ -3619,7 +3772,7 @@ Back: Красивый</pre>
         async function resetAllStats() {
             const ok = await showConfirmModal('Сбросить статистику', 'Сбросить всю статистику и достижения?', { confirmLabel: 'Сбросить' });
             if (!ok) return;
-            stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 } };
+            stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 }, reviewsShownToday: { date: null, count: 0 } };
             await saveStats();
             if (document.getElementById('current-folder-name').textContent === 'Статистика') {
                 showStatsView();
