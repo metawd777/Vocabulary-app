@@ -779,6 +779,21 @@
             }
         }
 
+        // "Тихая" версия — без модалки. Используется только для автосохранения при
+        // уходе приложения в фон (visibilitychange/beforeunload/pagehide), в том
+        // числе когда это срабатывает из-за системного окна "Сохранить файл" при
+        // экспорте. Показывать пугающий алерт "закончилось место" в этот момент
+        // не нужно: данные никуда не делись (остались в памяти), обычный автосейв
+        // повторит попытку при следующем действии, а модалка посреди чужого
+        // системного диалога всё равно не поможет пользователю — только напугает.
+        async function saveDataSilent() {
+            try {
+                await localforage.setItem('folders', folders);
+            } catch (e) {
+                console.warn('Фоновое сохранение не удалось (не критично, будет повторено):', e);
+            }
+        }
+
         async function saveStats() {
             try {
                 await localforage.setItem('stats', stats);
@@ -3930,8 +3945,25 @@ Back: Красивый</pre>
         // не срабатывают, не тратим время на заведомо провальную попытку). Английский —
         // Google TTS напрямую через <audio> (см. playGoogleTts) с откатом на
         // speechSynthesis при неудаче.
+        // iOS Safari разблокирует звук на странице только после первого УСПЕШНОГО
+        // аудио-действия внутри настоящего тапа. speechSynthesis — свой, доверенный
+        // механизм, обычно проходит с первого раза; <audio> с чужого домена (Google
+        // TTS) иногда не проходит именно как самое первое аудио на странице и молча
+        // виснет. Прогреваем разрешение тем же надёжным способом заранее, один раз.
+        let audioUnlocked = false;
+        function unlockAudioIfNeeded() {
+            if (audioUnlocked) return;
+            audioUnlocked = true;
+            try {
+                const warmup = new SpeechSynthesisUtterance(' ');
+                warmup.volume = 0;
+                window.speechSynthesis.speak(warmup);
+            } catch (e) {}
+        }
+
         async function speakWord(text) {
             if (!text) return;
+            unlockAudioIfNeeded();
             text = removeEmojis(text);
             if (!text) return;
 
@@ -4191,8 +4223,8 @@ Back: Красивый</pre>
 
         function flushPendingChanges() {
             try {
-                if (typeof saveData === 'function') {
-                    saveData();
+                if (typeof saveDataSilent === 'function') {
+                    saveDataSilent();
                 }
             } catch (e) {
                 console.warn('Ошибка при принудительном сохранении:', e);
@@ -4202,8 +4234,8 @@ Back: Красивый</pre>
         document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState === 'hidden') {
                 try {
-                    if (typeof saveData === 'function') {
-                        await saveData();
+                    if (typeof saveDataSilent === 'function') {
+                        await saveDataSilent();
                     }
                 } catch (e) {
                     console.warn('Ошибка сохранения при скрытии страницы:', e);
