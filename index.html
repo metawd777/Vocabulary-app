@@ -215,8 +215,8 @@
 
         #undo-review-btn {
             position: absolute;
-            bottom: 12px;
-            right: 12px;
+            top: 12px;
+            left: 12px;
             width: 40px;
             height: 40px;
             border-radius: 9999px;
@@ -494,12 +494,12 @@
         let editingCardId = null;
         let viewingCardId = null;
         let editContext = 'folder';
-        let stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 }, reviewsShownToday: { date: null, count: 0 } };
+        let stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 }, reviewsShownToday: { date: null, count: 0 }, pureReviewsShownToday: { date: null, count: 0 } };
         let lastReviewedCard = null;
         let undoStack = [];
         let dailyLimitEnabled = false;
         let dailyLimitCount = 20;
-        let dailyReviewLimitEnabled = false;
+        let secondLimitMode = 'off'; // 'off' | 'reviews_only' | 'total'
         let dailyReviewLimitCount = 100;
         let archiveThresholdDays = 30;
         let shuffleEnabled = true;
@@ -804,6 +804,7 @@
                         totalImages: stored.totalImages || 0,
                         newShownToday: stored.newShownToday || { date: null, count: 0 },
                         reviewsShownToday: stored.reviewsShownToday || { date: null, count: 0 },
+                        pureReviewsShownToday: stored.pureReviewsShownToday || { date: null, count: 0 },
                         longestStreak: stored.longestStreak || 0
                     };
                 }
@@ -818,7 +819,7 @@
                 if (stored && typeof stored === 'object') {
                     dailyLimitEnabled = !!stored.dailyLimitEnabled;
                     dailyLimitCount = parseInt(stored.dailyLimitCount) || 20;
-                    dailyReviewLimitEnabled = !!stored.dailyReviewLimitEnabled;
+                    secondLimitMode = stored.secondLimitMode || 'off';
                     dailyReviewLimitCount = parseInt(stored.dailyReviewLimitCount) || 100;
                     archiveThresholdDays = stored.archiveThresholdDays !== undefined ? Number(stored.archiveThresholdDays) : 30;
                     shuffleEnabled = stored.shuffleEnabled !== undefined ? !!stored.shuffleEnabled : true;
@@ -841,7 +842,7 @@
 
         async function saveLimitSettings() {
             try {
-                await localforage.setItem('limitSettings', { dailyLimitEnabled, dailyLimitCount, dailyReviewLimitEnabled, dailyReviewLimitCount, archiveThresholdDays, shuffleEnabled, cardOrderMode });
+                await localforage.setItem('limitSettings', { dailyLimitEnabled, dailyLimitCount, secondLimitMode, dailyReviewLimitCount, archiveThresholdDays, shuffleEnabled, cardOrderMode });
             } catch (e) {
                 console.error('Ошибка сохранения настроек лимита:', e);
             }
@@ -1066,6 +1067,7 @@
             const now = new Date();
             if (!card.state) card.state = 'new';
             const wasNew = card.state === 'new'; // фиксируем ДО мутации — нужно для честного учёта дневного лимита
+            const wasPureReview = card.state === 'review' || card.state === 'relearning';
             if (typeof card.reps === 'undefined') card.reps = 0;
             if (typeof card.lapses === 'undefined') card.lapses = 0;
             card.reps++;
@@ -1156,7 +1158,7 @@
             // оценку — не в момент, когда оно просто попало в очередь показа.
             // Если сессию закрыли, не дойдя до слова, оно не должно сгорать
             // из дневного лимита впустую.
-            if (wasNew && dailyLimitEnabled) {
+            if (dailyLimitEnabled === true && wasNew) {
                 const todayKey = localDateKey(getEffectiveDate(now));
                 if (!stats.newShownToday || stats.newShownToday.date !== todayKey) {
                     stats.newShownToday = { date: todayKey, count: 0 };
@@ -1165,12 +1167,19 @@
                 await saveStats();
             }
 
-            if (dailyReviewLimitEnabled) {
+            // Оба счётчика (общий и "чистые повторения") считаем всегда, пока режим
+            // не 'off' — иначе переключение режима среди дня давало бы неверные
+            // (обнулённые) цифры для того счётчика, который был выключен.
+            if (secondLimitMode !== 'off') {
                 const todayKey = localDateKey(getEffectiveDate(now));
                 if (!stats.reviewsShownToday || stats.reviewsShownToday.date !== todayKey) {
                     stats.reviewsShownToday = { date: todayKey, count: 0 };
                 }
                 stats.reviewsShownToday.count++;
+                if (!stats.pureReviewsShownToday || stats.pureReviewsShownToday.date !== todayKey) {
+                    stats.pureReviewsShownToday = { date: todayKey, count: 0 };
+                }
+                if (wasPureReview) stats.pureReviewsShownToday.count++;
                 await saveStats();
             }
 
@@ -1260,7 +1269,20 @@
                 });
             }
 
-            if (dailyReviewLimitEnabled) {
+            if (secondLimitMode === 'reviews_only') {
+                const todayKey = localDateKey(getEffectiveDate());
+                if (!stats.pureReviewsShownToday || stats.pureReviewsShownToday.date !== todayKey) {
+                    stats.pureReviewsShownToday = { date: todayKey, count: 0 };
+                }
+                const remaining = Math.max(0, dailyReviewLimitCount - stats.pureReviewsShownToday.count);
+                let used = 0;
+                result = result.filter(card => {
+                    if (card.state !== 'review' && card.state !== 'relearning') return true;
+                    if (used >= remaining) return false;
+                    used++;
+                    return true;
+                });
+            } else if (secondLimitMode === 'total') {
                 const todayKey = localDateKey(getEffectiveDate());
                 if (!stats.reviewsShownToday || stats.reviewsShownToday.date !== todayKey) {
                     stats.reviewsShownToday = { date: todayKey, count: 0 };
@@ -2600,15 +2622,22 @@
 
             const dueNow = cardsInScope ? getDueCardsFromArray(cardsInScope) : [];
             const hasDueNew = dueNow.some(c => c.state === 'new');
+            const hasDuePureReview = dueNow.some(c => c.state === 'review' || c.state === 'relearning');
             const todayKeyEff = localDateKey(getEffectiveDate());
             const newRemaining = dailyLimitEnabled
                 ? Math.max(0, dailyLimitCount - (stats.newShownToday && stats.newShownToday.date === todayKeyEff ? stats.newShownToday.count : 0))
                 : Infinity;
-            const reviewRemaining = dailyReviewLimitEnabled
-                ? Math.max(0, dailyReviewLimitCount - (stats.reviewsShownToday && stats.reviewsShownToday.date === todayKeyEff ? stats.reviewsShownToday.count : 0))
-                : Infinity;
+            const secondRemaining = secondLimitMode === 'off'
+                ? Infinity
+                : Math.max(0, dailyReviewLimitCount - (secondLimitMode === 'reviews_only'
+                    ? (stats.pureReviewsShownToday && stats.pureReviewsShownToday.date === todayKeyEff ? stats.pureReviewsShownToday.count : 0)
+                    : (stats.reviewsShownToday && stats.reviewsShownToday.date === todayKeyEff ? stats.reviewsShownToday.count : 0)));
             const newLimitIsBlocker = dailyLimitEnabled && newRemaining <= 0 && hasDueNew;
-            const reviewLimitIsBlocker = dailyReviewLimitEnabled && reviewRemaining <= 0 && dueNow.length > 0;
+            const reviewLimitIsBlocker = secondLimitMode === 'reviews_only'
+                ? (secondRemaining <= 0 && hasDuePureReview)
+                : secondLimitMode === 'total'
+                    ? (secondRemaining <= 0 && dueNow.length > 0)
+                    : false;
 
             // "Следующее повторение" имеет смысл только для карточек с реальным
             // расписанием — у новых слов его нет (они доступны сразу же, просто
@@ -2619,9 +2648,9 @@
 
             let message;
             if (newLimitIsBlocker && reviewLimitIsBlocker) {
-                message = `В «${escapeHtml(sourceName)}» на сегодня исчерпаны оба лимита — и по новым словам, и по общему числу карточек.<br>Всё обновится завтра.`;
+                message = `В «${escapeHtml(sourceName)}» на сегодня исчерпаны оба лимита — и по новым словам, и по повторениям.<br>Всё обновится завтра.`;
             } else if (reviewLimitIsBlocker) {
-                message = `В «${escapeHtml(sourceName)}» на сегодня исчерпан общий лимит карточек в день.<br>Обновится завтра.`;
+                message = `В «${escapeHtml(sourceName)}» на сегодня исчерпан лимит повторений.<br>Обновится завтра.`;
             } else if (newLimitIsBlocker) {
                 message = `В «${escapeHtml(sourceName)}» дневной лимит новых слов на сегодня исчерпан.` +
                     (nextReview ? `<br>Ближайшее повторение остальных слов — ${nextReview.text}.` : '<br>Новые слова станут доступны завтра.');
@@ -3571,7 +3600,7 @@ Back: Красивый</pre>
                         { confirmLabel: 'Сбросить', cancelLabel: 'Оставить как есть' }
                     );
                     if (resetStatsToo) {
-                        stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 }, reviewsShownToday: { date: null, count: 0 } };
+                        stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 }, reviewsShownToday: { date: null, count: 0 }, pureReviewsShownToday: { date: null, count: 0 } };
                         await saveStats();
                     }
                 } else {
@@ -3626,16 +3655,18 @@ Back: Красивый</pre>
                     </div>
                     <div class="panel">
                         <div class="font-semibold text-base mb-3">Лимит повторений в день</div>
-                        <label class="flex items-center gap-3 cursor-pointer mb-2">
-                            <input type="checkbox" id="review-limit-toggle" ${dailyReviewLimitEnabled ? 'checked' : ''} onchange="toggleReviewLimit(this.checked)" class="w-5 h-5 accent-teal-600">
-                            <span class="text-sm">Ограничивать общее число карточек в день</span>
-                        </label>
-                        <div id="review-limit-count-wrapper" class="${dailyReviewLimitEnabled ? '' : 'hidden'} mt-2">
-                            <label class="text-sm">Максимум карточек (любых) в день:</label>
+                        <label class="text-sm block mb-1">Режим:</label>
+                        <select id="second-limit-mode-select" onchange="updateSecondLimitMode(this.value)" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target mb-2">
+                            <option value="off" ${secondLimitMode === 'off' ? 'selected' : ''}>Выключено</option>
+                            <option value="reviews_only" ${secondLimitMode === 'reviews_only' ? 'selected' : ''}>Только повторения (без новых)</option>
+                            <option value="total" ${secondLimitMode === 'total' ? 'selected' : ''}>Общее число карточек (включая новые)</option>
+                        </select>
+                        <div id="review-limit-count-wrapper" class="${secondLimitMode === 'off' ? 'hidden' : ''} mt-2">
+                            <label class="text-sm">Максимум карточек в день:</label>
                             <input type="number" id="review-limit-count" value="${dailyReviewLimitCount}" min="1" max="9999" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" onchange="updateReviewLimitCount(this.value)">
                         </div>
                         <div class="text-xs text-slate-400 dark:text-slate-500 mt-2">
-                            Независимо от лимита новых слов — считает вообще все показанные и оценённые карточки за день, включая повторения. Полезно, если хочется ограничить общее время на занятия, а не только приток новых слов.
+                            «Только повторения» считает слова со статусом «На повторении»/«Переучиваются» — новые слова и карточки в процессе обучения сюда не входят и никогда не «зависают» на середине. «Общее число» — жёсткий потолок вообще на всё, включая ещё не законченные шаги обучения.
                         </div>
                     </div>
                     <div class="panel">
@@ -3731,10 +3762,10 @@ Back: Красивый</pre>
             }
         }
 
-        async function toggleReviewLimit(enabled) {
-            dailyReviewLimitEnabled = enabled;
+        async function updateSecondLimitMode(mode) {
+            secondLimitMode = mode;
             await saveLimitSettings();
-            document.getElementById('review-limit-count-wrapper').classList.toggle('hidden', !enabled);
+            document.getElementById('review-limit-count-wrapper').classList.toggle('hidden', mode === 'off');
         }
 
         async function updateReviewLimitCount(value) {
@@ -3767,7 +3798,7 @@ Back: Красивый</pre>
         async function resetAllStats() {
             const ok = await showConfirmModal('Сбросить статистику', 'Сбросить всю статистику и достижения?', { confirmLabel: 'Сбросить' });
             if (!ok) return;
-            stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 }, reviewsShownToday: { date: null, count: 0 } };
+            stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 }, reviewsShownToday: { date: null, count: 0 }, pureReviewsShownToday: { date: null, count: 0 } };
             await saveStats();
             if (document.getElementById('current-folder-name').textContent === 'Статистика') {
                 showStatsView();
