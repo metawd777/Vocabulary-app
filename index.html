@@ -3945,25 +3945,8 @@ Back: Красивый</pre>
         // не срабатывают, не тратим время на заведомо провальную попытку). Английский —
         // Google TTS напрямую через <audio> (см. playGoogleTts) с откатом на
         // speechSynthesis при неудаче.
-        // iOS Safari разблокирует звук на странице только после первого УСПЕШНОГО
-        // аудио-действия внутри настоящего тапа. speechSynthesis — свой, доверенный
-        // механизм, обычно проходит с первого раза; <audio> с чужого домена (Google
-        // TTS) иногда не проходит именно как самое первое аудио на странице и молча
-        // виснет. Прогреваем разрешение тем же надёжным способом заранее, один раз.
-        let audioUnlocked = false;
-        function unlockAudioIfNeeded() {
-            if (audioUnlocked) return;
-            audioUnlocked = true;
-            try {
-                const warmup = new SpeechSynthesisUtterance(' ');
-                warmup.volume = 0;
-                window.speechSynthesis.speak(warmup);
-            } catch (e) {}
-        }
-
         async function speakWord(text) {
             if (!text) return;
-            unlockAudioIfNeeded();
             text = removeEmojis(text);
             if (!text) return;
 
