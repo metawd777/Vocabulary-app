@@ -481,7 +481,6 @@
         const CONSTANTS = {
             MAX_UNDO_STEPS: 5,
             DEBOUNCE_SAVE_DELAY_MS: 450,
-            TTS_TIMEOUT_MS: 2200,
             MIN_STUDY_FONT_SCALE: 0.35,
             LONG_PRESS_DURATION_MS: 520,
         };
@@ -512,10 +511,6 @@
         // ---- Мультивыбор ----
         let selectionMode = false;
         let selectedCardIds = new Set();
-
-        // ---- Аудиокеш (готовые <audio>-элементы Google TTS, чтобы повторный клик
-        // по тому же слову не бил в сеть заново) ----
-        const googleAudioCache = new Map();
 
         // ---- Защита Escape ----
         let escapeHandlerAdded = false;
@@ -3560,10 +3555,29 @@ Back: Красивый</pre>
             }
 
             const data = JSON.stringify(exportFolders, null, 2);
+            const fileName = `vocabulary_backup_${new Date().toISOString().slice(0,10)}.json`;
+            const file = new File([data], fileName, { type: 'application/json' });
+
+            // На телефоне (iOS/Android) системный диалог «Поделиться» даёт явный
+            // выбор места сохранения — «Сохранить в Файлы», Telegram, AirDrop и т.д. —
+            // в отличие от тихого автоскачивания в системную папку загрузок.
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({ files: [file], title: fileName });
+                    return;
+                } catch (error) {
+                    if (error.name === 'AbortError') return; // пользователь сам отменил — не ошибка
+                    console.warn('Web Share не сработал, переключаемся на обычное скачивание:', error);
+                }
+            }
+
+            // Десктоп или браузер без поддержки Web Share — обычное скачивание,
+            // но с явной подсказкой, куда обычно попадает файл.
             const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob([data], {type: 'application/json'}));
-            a.download = `vocabulary_backup_${new Date().toISOString().slice(0,10)}.json`;
+            a.href = URL.createObjectURL(file);
+            a.download = fileName;
             a.click();
+            await showAlertModal('Экспорт готов', `Файл «${fileName}» сохранён в папку загрузок браузера (обычно «Загрузки» / Downloads).`);
         }
 
         function deduplicateSystemFolders() {
@@ -3903,78 +3917,29 @@ Back: Красивый</pre>
             return cyrillicCount > latinCount ? 'ru' : 'en';
         }
 
-        // Играет Google TTS напрямую через <audio>, БЕЗ fetch(). Это принципиально:
-        // fetch() к чужому домену требует, чтобы сервер сам разрешил CORS-заголовком
-        // чтение ответа — а Google TTS неофициальный, такого заголовка может не быть,
-        // и fetch() тогда молча проваливается при каждом запросе. Аудио-тег имеет
-        // право проигрывать чужой домен без единого CORS-заголовка — это отдельное,
-        // куда более старое правило браузеров, и именно так этот трюк работает везде,
-        // где он реально работает.
-        function playGoogleTts(text, langCode) {
-            return new Promise((resolve, reject) => {
-                const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${langCode}&client=tw-ob&q=${encodeURIComponent(text)}`;
-                const audio = new Audio(url);
-                audio.referrerPolicy = 'no-referrer'; // обязательное условие — иначе Google не отдаёт аудио вовсе
-                let settled = false;
-                const timer = setTimeout(() => {
-                    if (settled) return;
-                    settled = true;
-                    reject(new Error('Google TTS: таймаут'));
-                }, CONSTANTS.TTS_TIMEOUT_MS);
-
-                audio.addEventListener('error', () => {
-                    if (settled) return;
-                    settled = true;
-                    clearTimeout(timer);
-                    reject(new Error('Google TTS: ошибка загрузки аудио'));
-                });
-
-                audio.play().then(() => {
-                    if (settled) return;
-                    settled = true;
-                    clearTimeout(timer);
-                    resolve(audio);
-                }).catch((err) => {
-                    if (settled) return;
-                    settled = true;
-                    clearTimeout(timer);
-                    reject(err);
-                });
-            });
-        }
-
-        // Русский — сразу через speechSynthesis (внешние сервисы для него на практике
-        // не срабатывают, не тратим время на заведомо провальную попытку). Английский —
-        // Google TTS напрямую через <audio> (см. playGoogleTts) с откатом на
-        // speechSynthesis при неудаче.
+        // Озвучка идёт через встроенный в браузер/ОС голос (Web Speech API).
+        // Раньше здесь был хак с прямым запросом к translate.google.com/translate_tts —
+        // Google отключил этот эндпоинт ещё в середине 2023 года. Сейчас там
+        // POST-протокол ("batchexecute"), который из браузера недоступен без
+        // сервера-прокси (упирается в CORS), так что воспроизвести это надёжно
+        // прямо в статичном HTML-файле нельзя. Поэтому используем системный
+        // голос устройства — он работает всегда, без сети и без задержек,
+        // а его качество вытягиваем выбором лучшего доступного голоса (см.
+        // pickBestVoice ниже).
         async function speakWord(text) {
             if (!text) return;
             text = removeEmojis(text);
             if (!text) return;
 
             const lang = detectLanguage(text);
-            const langCode = lang === 'en' ? 'en-US' : 'ru';
-            const cacheKey = `${lang}:${text}`;
-
-            const cachedAudio = googleAudioCache.get(cacheKey);
-            if (cachedAudio) {
-                cachedAudio.currentTime = 0;
-                cachedAudio.play().catch(() => {});
-                return;
-            }
-
-            try {
-                const audio = await playGoogleTts(text, langCode);
-                googleAudioCache.set(cacheKey, audio);
-            } catch (error) {
-                console.warn('Google TTS не сработал, переключаемся на speechSynthesis:', error.message);
-                await fallbackSpeak(text, lang);
-            }
+            await speakViaSystemVoice(text, lang);
         }
 
-        // Выбирает лучший доступный голос: сначала по точному совпадению языка,
-        // затем отдаёт предпочтение «улучшенным»/нейросетевым голосам (обычно
-        // заметно приятнее звучат, чем голос по умолчанию), избегая явно урезанных.
+        // Выбирает лучший доступный голос: сначала строго по языку (для английского —
+        // именно en-US, американский акцент, а не британский en-GB), затем среди
+        // найденных отдаёт предпочтение качественным голосам — Enhanced/Premium
+        // (iOS/macOS), Natural (Windows/Edge), Google (Android/Chrome) — они звучат
+        // заметно естественнее голоса по умолчанию, избегая явно урезанных ("Compact").
         function pickBestVoice(voices, langCode, lang) {
             if (!voices || voices.length === 0) return null;
 
@@ -3989,7 +3954,7 @@ Back: Красивый</pre>
             const scored = pool.map(v => {
                 const name = (v.name || '').toLowerCase();
                 let score = 0;
-                if (/premium|enhanced|neural|natural|wavenet/.test(name)) score += 10;
+                if (/premium|enhanced|neural|natural|wavenet|google/.test(name)) score += 10;
                 if (/compact/.test(name)) score -= 5;
                 if (v.localService) score += 1;
                 return { voice: v, score };
@@ -3998,10 +3963,8 @@ Back: Красивый</pre>
             return scored[0].voice;
         }
 
-        async function fallbackSpeak(text, lang) {
+        async function speakViaSystemVoice(text, lang) {
             if (!window.speechSynthesis) return;
-            text = removeEmojis(text);
-            if (!text) return;
             window.speechSynthesis.cancel();
 
             const voices = await loadVoices();
