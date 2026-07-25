@@ -4007,31 +4007,89 @@ Back: Красивый</pre>
             return cyrillicCount > latinCount ? 'ru' : 'en';
         }
 
-        // Озвучка идёт через встроенный в браузер/ОС голос (Web Speech API).
-        // Раньше здесь был хак с прямым запросом к translate.google.com/translate_tts —
-        // Google отключил этот эндпоинт ещё в середине 2023 года. Сейчас там
-        // POST-протокол ("batchexecute"), который из браузера недоступен без
-        // сервера-прокси (упирается в CORS), так что воспроизвести это надёжно
-        // прямо в статичном HTML-файле нельзя. Поэтому используем системный
-        // голос устройства.
+        // Озвучка: сначала пробуем более естественный голос через Edge TTS
+        // (нейросетевые голоса Microsoft, доступ без ключей и регистрации),
+        // а системный голос устройства держим как ГАРАНТИРОВАННЫЙ запасной
+        // вариант. Это принципиально гонка, а не цепочка "сначала одно, потом
+        // при ошибке другое" — на плохой сети такая цепочка рискует потерять
+        // жест пользователя (см. ниже) и замолчать вообще на обоих вариантах.
+        //
+        // ЧЕСТНО О НАДЁЖНОСТИ EDGE TTS: Microsoft в последнее время требует от
+        // WebSocket-соединения нестандартный заголовок Sec-WebSocket-Version —
+        // а такие заголовки браузер в принципе не даёт выставить через JS ни в
+        // одном браузере (это ограничение самого WebSocket API, не баг
+        // конкретной библиотеки). Поэтому Edge TTS может не сработать в
+        // Safari — заранее это не проверить без реального теста на
+        // устройстве. Именно поэтому это необязательное УЛУЧШЕНИЕ, а не
+        // единственный путь.
         //
         // КРИТИЧНО для iOS Safari: speechSynthesis.speak() обязан вызываться
         // СИНХРОННО в рамках того же клика/тапа — если между нажатием кнопки и
         // .speak() проходит хоть один await на промис, который резолвится не
-        // мгновенно (event listener, setTimeout), Safari молча ничего не
-        // озвучивает — ни ошибки, ни звука. Раньше здесь был `await loadVoices()`
-        // прямо в обработчике клика, и голоса почти никогда не были прогреты
-        // заранее — отсюда полная тишина и на русском, и на английском
-        // одновременно (это не баг выбора голоса, это баг тайминга вызова).
-        // Голоса теперь прогреваются один раз при старте приложения (см. init()),
-        // поэтому к моменту первого тапа .speak() почти всегда вызывается
-        // синхронно, без единого await между кликом и звуком.
+        // мгновенно, Safari молча ничего не озвучивает. Голоса прогреваются
+        // один раз при старте приложения (см. init()), поэтому системный голос
+        // ниже вызывается синхронно почти всегда.
+        let currentEdgeAudio = null;
+        let ttsCallToken = 0;
+
         function speakWord(text) {
             if (!text) return;
             text = removeEmojis(text);
             if (!text) return;
             const lang = detectLanguage(text);
-            speakViaSystemVoice(text, lang);
+
+            // Новый тап — отменяем всё, что могло играть от предыдущего слова
+            ttsCallToken++;
+            const myToken = ttsCallToken;
+            if (currentEdgeAudio) {
+                try { currentEdgeAudio.pause(); } catch (e) {}
+                currentEdgeAudio = null;
+            }
+
+            let settled = false;
+
+            // Гарантированный путь: если через 600 мс Edge TTS ещё не ответил,
+            // сразу играем системный голос — тишины быть не должно.
+            const fallbackTimer = setTimeout(() => {
+                if (settled || myToken !== ttsCallToken) return;
+                settled = true;
+                speakViaSystemVoice(text, lang);
+            }, 600);
+
+            tryEdgeTts(text, lang).then((audio) => {
+                if (myToken !== ttsCallToken) return; // уже неактуально — тапнули другое слово
+                if (settled) return; // системный голос уже начал звучать — не перебиваем
+                settled = true;
+                clearTimeout(fallbackTimer);
+                currentEdgeAudio = audio;
+                audio.play().catch(() => speakViaSystemVoice(text, lang));
+            }).catch((err) => {
+                console.warn('Edge TTS недоступен, играем системный голос:', err && err.message);
+                if (settled || myToken !== ttsCallToken) return;
+                settled = true;
+                clearTimeout(fallbackTimer);
+                speakViaSystemVoice(text, lang);
+            });
+        }
+
+        // Пробует получить аудио через Edge TTS (нейросетевые голоса Microsoft,
+        // без ключей). Библиотека грузится динамически с CDN — если сети нет
+        // или сервис недоступен, промис просто отклонится, и вызывающий код
+        // (см. speakWord выше) переключится на системный голос.
+        async function tryEdgeTts(text, lang) {
+            const { Communicate } = await import('https://esm.sh/edge-tts-ts');
+            const voice = lang === 'en' ? 'en-US-AriaNeural' : 'ru-RU-SvetlanaNeural';
+            const communicate = new Communicate(text, { voice });
+            const chunks = [];
+            for await (const chunk of communicate.stream()) {
+                if (chunk.type === 'audio' && chunk.data) chunks.push(chunk.data);
+            }
+            if (!chunks.length) throw new Error('Edge TTS вернул пустое аудио');
+            const blob = new Blob(chunks, { type: 'audio/mpeg' });
+            const url = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            audio.addEventListener('ended', () => URL.revokeObjectURL(url), { once: true });
+            return audio;
         }
 
         // Выбирает лучший доступный голос: сначала строго по языку (для английского —
