@@ -666,9 +666,17 @@
                         card.nextReviewDate = now;
                         cardChanged = true;
                     }
-                    const looksNew = (card.state === 'new') ||
-                                     ((card.reps || 0) === 0) ||
-                                     (card.stability === undefined || card.stability === null);
+                    const hasValidState = card.state === 'new' || card.state === 'learning' || card.state === 'review' || card.state === 'relearning';
+                    // ВАЖНО: у карточек в статусе learning (оценены "Снова"/"Трудно"/"Хорошо",
+                    // но ещё не выпустились в полноценные повторения) stability/difficulty
+                    // ещё не назначены по конструкции — это нормальное состояние, а не
+                    // признак битых данных. Раньше это ошибочно приравнивалось к "new" и
+                    // откатывало весь прогресс карточки при каждом запуске приложения.
+                    // Настоящая порча данных — это когда review/relearning карточка (для
+                    // которых stability обязана быть) её лишена.
+                    const looksCorrupted = (card.state === 'review' || card.state === 'relearning') &&
+                                           (card.stability === undefined || card.stability === null);
+                    const looksNew = !hasValidState || card.state === 'new' || looksCorrupted;
                     if (looksNew) {
                         card.state = 'new';
                         card.reps = 0;
@@ -676,6 +684,7 @@
                         delete card.stability;
                         delete card.difficulty;
                         delete card.learningStep;
+                        delete card.lastGrade;
                         card.last_review = null;
                         card.nextReviewDate = now;
                         card.masteredSuggestionDismissed = false;
@@ -683,10 +692,6 @@
                     } else {
                         card.stability = safeStability(card.stability);
                         card.difficulty = safeDifficulty(card.difficulty);
-                    }
-                    if (!card.state) {
-                        card.state = 'new';
-                        cardChanged = true;
                     }
                     if (cardChanged) changed = true;
                 });
