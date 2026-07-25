@@ -3517,6 +3517,54 @@
             }
         }
 
+        // Диагностика озвучки: показывает реальное состояние Web Speech API на
+        // этом устройстве — есть ли голоса, и (главное) действительно ли
+        // срабатывает произнесение, а если нет — с какой именно ошибкой. Это
+        // единственный способ увидеть, что происходит на конкретном
+        // устройстве пользователя, не имея к нему доступа.
+        async function runTtsDiagnostics() {
+            const lines = [];
+            const support = !!window.speechSynthesis;
+            lines.push(`speechSynthesis доступен: ${support ? 'да' : 'НЕТ'}`);
+            if (!support) {
+                await showAlertModal('Диагностика озвучки', lines.join('\n'));
+                return;
+            }
+
+            const voices = window.speechSynthesis.getVoices();
+            lines.push(`Голосов найдено сейчас: ${voices.length}`);
+            if (voices.length > 0) {
+                const enVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('en'));
+                const ruVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('ru'));
+                lines.push(`Английских: ${enVoices.length}${enVoices[0] ? ' (напр. «' + enVoices[0].name + '»)' : ''}`);
+                lines.push(`Русских: ${ruVoices.length}${ruVoices[0] ? ' (напр. «' + ruVoices[0].name + '»)' : ''}`);
+            }
+            lines.push('');
+            lines.push('Пробую произнести тестовое слово...');
+
+            const result = await new Promise((resolve) => {
+                try {
+                    const utt = new SpeechSynthesisUtterance('test');
+                    utt.volume = 1;
+                    let done = false;
+                    utt.onstart = () => { if (!done) { done = true; resolve('успешно запустилось (событие start)'); } };
+                    utt.onerror = (e) => { if (!done) { done = true; resolve('ОШИБКА: "' + (e.error || 'неизвестная') + '"'); } };
+                    utt.onend = () => { if (!done) { done = true; resolve('завершилось без события start (подозрительно)'); } };
+                    window.speechSynthesis.speak(utt);
+                    setTimeout(() => {
+                        if (!done) { done = true; resolve('ТАЙМАУТ — за 3 секунды не пришло ни start, ни error, ни end'); }
+                    }, 3000);
+                } catch (e) {
+                    resolve('ИСКЛЮЧЕНИЕ: ' + e.message);
+                }
+            });
+            lines.push('Результат: ' + result);
+            lines.push('');
+            lines.push('Физический переключатель бесшумного режима на корпусе телефона это API не сообщает — проверьте отдельно.');
+
+            await showAlertModal('Диагностика озвучки', lines.join('\n'));
+        }
+
         function showImportHelpModal() {
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]';
@@ -3766,6 +3814,13 @@ Back: Красивый</pre>
                         <div class="text-xs text-slate-400 dark:text-slate-500 mt-2">
                             Меньше — быстрее разгружаешь колоду от явно знакомых слов. Больше — увереннее в закреплении (полезно, например, перед экзаменом).
                         </div>
+                    </div>
+                    <div class="panel">
+                        <div class="font-semibold text-base mb-3">Диагностика озвучки</div>
+                        <div class="text-xs text-slate-400 dark:text-slate-500 mb-3">
+                            Покажет, что реально происходит с озвучкой на этом устройстве: есть ли голоса, срабатывает ли произнесение, и если нет — какая именно ошибка.
+                        </div>
+                        <button onclick="runTtsDiagnostics()" class="w-full py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target">Проверить озвучку</button>
                     </div>
                     <div class="panel">
                         <div class="flex items-center justify-between mb-3">
