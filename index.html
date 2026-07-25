@@ -3958,16 +3958,25 @@ Back: Красивый</pre>
         // POST-протокол ("batchexecute"), который из браузера недоступен без
         // сервера-прокси (упирается в CORS), так что воспроизвести это надёжно
         // прямо в статичном HTML-файле нельзя. Поэтому используем системный
-        // голос устройства — он работает всегда, без сети и без задержек,
-        // а его качество вытягиваем выбором лучшего доступного голоса (см.
-        // pickBestVoice ниже).
-        async function speakWord(text) {
+        // голос устройства.
+        //
+        // КРИТИЧНО для iOS Safari: speechSynthesis.speak() обязан вызываться
+        // СИНХРОННО в рамках того же клика/тапа — если между нажатием кнопки и
+        // .speak() проходит хоть один await на промис, который резолвится не
+        // мгновенно (event listener, setTimeout), Safari молча ничего не
+        // озвучивает — ни ошибки, ни звука. Раньше здесь был `await loadVoices()`
+        // прямо в обработчике клика, и голоса почти никогда не были прогреты
+        // заранее — отсюда полная тишина и на русском, и на английском
+        // одновременно (это не баг выбора голоса, это баг тайминга вызова).
+        // Голоса теперь прогреваются один раз при старте приложения (см. init()),
+        // поэтому к моменту первого тапа .speak() почти всегда вызывается
+        // синхронно, без единого await между кликом и звуком.
+        function speakWord(text) {
             if (!text) return;
             text = removeEmojis(text);
             if (!text) return;
-
             const lang = detectLanguage(text);
-            await speakViaSystemVoice(text, lang);
+            speakViaSystemVoice(text, lang);
         }
 
         // Выбирает лучший доступный голос: сначала строго по языку (для английского —
@@ -3998,21 +4007,35 @@ Back: Красивый</pre>
             return scored[0].voice;
         }
 
-        async function speakViaSystemVoice(text, lang) {
+        function speakViaSystemVoice(text, lang) {
             if (!window.speechSynthesis) return;
-            window.speechSynthesis.cancel();
-
-            const voices = await loadVoices();
             const langCode = lang === 'en' ? 'en-US' : 'ru-RU';
-            const voice = pickBestVoice(voices, langCode, lang);
 
-            const utterance = new SpeechSynthesisUtterance(text);
-            if (voice) utterance.voice = voice;
-            utterance.lang = langCode;
-            utterance.rate = 0.9;
-            utterance.pitch = 1;
-            utterance.volume = 1;
-            window.speechSynthesis.speak(utterance);
+            const fire = (voices) => {
+                // cancel() отменяем ТОЛЬКО если реально что-то говорится/в очереди —
+                // синхронный cancel()+speak() подряд на пустой очереди на части
+                // версий Chrome иногда молча "проглатывает" speak(). Так безопаснее.
+                if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+                    window.speechSynthesis.cancel();
+                }
+                const voice = pickBestVoice(voices, langCode, lang);
+                const utterance = new SpeechSynthesisUtterance(text);
+                if (voice) utterance.voice = voice;
+                utterance.lang = langCode;
+                utterance.rate = 0.9;
+                utterance.pitch = 1;
+                utterance.volume = 1;
+                window.speechSynthesis.speak(utterance);
+            };
+
+            if (voicesLoaded && voicesList.length > 0) {
+                fire(voicesList); // основной путь: синхронно, в рамках тапа пользователя
+            } else {
+                // Голоса ещё не прогрелись (маловероятно после прогрева в init(),
+                // но подстрахуемся) — здесь синхронность уже не гарантирована,
+                // это осознанный компромисс только для самого первого холодного тапа.
+                loadVoices().then(fire);
+            }
         }
 
         let voicesLoaded = false;
@@ -4180,6 +4203,12 @@ Back: Красивый</pre>
 
         // ==================== ИНИЦИАЛИЗАЦИЯ ====================
         async function init() {
+            // Прогреваем голоса TTS максимально рано и без ожидания — на iOS
+            // Safari список голосов иногда приходит не мгновенно, а speak()
+            // обязан вызываться синхронно с тапом пользователя. Прогрев здесь
+            // гарантирует, что к первому нажатию на озвучку голоса уже готовы.
+            loadVoices();
+
             await loadData();
             validateAndRepairData();
             await loadStats();
