@@ -3517,63 +3517,40 @@
             }
         }
 
-        // Диагностика озвучки: показывает реальное состояние Web Speech API на
-        // этом устройстве — есть ли голоса, и (главное) действительно ли
-        // срабатывает произнесение, а если нет — с какой именно ошибкой. Это
-        // единственный способ увидеть, что происходит на конкретном
-        // устройстве пользователя, не имея к нему доступа.
-        async function runTtsDiagnostics() {
-            const lines = [];
-            const support = !!window.speechSynthesis;
-            lines.push(`speechSynthesis доступен: ${support ? 'да' : 'НЕТ'}`);
-            if (!support) {
-                await showAlertModal('Диагностика озвучки', lines.join('\n'));
-                return;
-            }
+        // Ручной выбор голоса озвучки. Автоподбор (pickBestVoice) угадывает
+        // качественный голос по ключевым словам в названии (Enhanced,
+        // Premium, Neural...), но на некоторых устройствах эти пометки не
+        // попадают в voice.name, который отдаёт браузер — тогда автоподбор
+        // не может отличить хороший голос от обычного. Ручной выбор снимает
+        // эту неопределённость: пользователь выбирает голос напрямую по
+        // имени из полного списка, установленного на устройстве.
+        let manualVoiceEnName = null; // null = автоподбор
+        let manualVoiceRuName = null;
 
-            const voices = window.speechSynthesis.getVoices();
-            lines.push(`Голосов найдено сейчас: ${voices.length}`);
-            if (voices.length > 0) {
-                const enVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('en'));
-                const ruVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('ru'));
-                lines.push(`Английских голосов всего: ${enVoices.length}`);
-                lines.push(`Русских голосов всего: ${ruVoices.length}`);
-                lines.push('');
-
-                const describe = (voice) => {
-                    if (!voice) return 'не найден';
-                    const isGood = /premium|enhanced|neural|natural|wavenet|google/i.test(voice.name || '');
-                    return `«${voice.name}» — ${isGood ? '✅ хорошего качества' : '⚠️ базовый (можно улучшить в Настройках устройства)'}`;
-                };
-                const bestEn = pickBestVoice(voices, 'en-US', 'en');
-                const bestRu = pickBestVoice(voices, 'ru-RU', 'ru');
-                lines.push(`Реально выбран для английского: ${describe(bestEn)}`);
-                lines.push(`Реально выбран для русского: ${describe(bestRu)}`);
-            }
-            lines.push('');
-            lines.push('Пробую произнести тестовое слово...');
-
-            const result = await new Promise((resolve) => {
-                try {
-                    const utt = new SpeechSynthesisUtterance('test');
-                    utt.volume = 1;
-                    let done = false;
-                    utt.onstart = () => { if (!done) { done = true; resolve('успешно запустилось (событие start)'); } };
-                    utt.onerror = (e) => { if (!done) { done = true; resolve('ОШИБКА: "' + (e.error || 'неизвестная') + '"'); } };
-                    utt.onend = () => { if (!done) { done = true; resolve('завершилось без события start (подозрительно)'); } };
-                    window.speechSynthesis.speak(utt);
-                    setTimeout(() => {
-                        if (!done) { done = true; resolve('ТАЙМАУТ — за 3 секунды не пришло ни start, ни error, ни end'); }
-                    }, 3000);
-                } catch (e) {
-                    resolve('ИСКЛЮЧЕНИЕ: ' + e.message);
+        async function loadTtsVoicePrefs() {
+            try {
+                const stored = await localforage.getItem('ttsVoicePrefs');
+                if (stored && typeof stored === 'object') {
+                    manualVoiceEnName = stored.en || null;
+                    manualVoiceRuName = stored.ru || null;
                 }
-            });
-            lines.push('Результат: ' + result);
-            lines.push('');
-            lines.push('Физический переключатель бесшумного режима на корпусе телефона это API не сообщает — проверьте отдельно.');
+            } catch (e) {
+                console.warn('Ошибка загрузки выбранного голоса озвучки:', e);
+            }
+        }
 
-            await showAlertModal('Диагностика озвучки', lines.join('\n'));
+        async function saveTtsVoicePrefs() {
+            try {
+                await localforage.setItem('ttsVoicePrefs', { en: manualVoiceEnName, ru: manualVoiceRuName });
+            } catch (e) {
+                console.error('Ошибка сохранения выбранного голоса озвучки:', e);
+            }
+        }
+
+        async function updateManualVoice(lang, voiceName) {
+            if (lang === 'en') manualVoiceEnName = voiceName || null;
+            else manualVoiceRuName = voiceName || null;
+            await saveTtsVoicePrefs();
         }
 
         function showImportHelpModal() {
@@ -3827,11 +3804,23 @@ Back: Красивый</pre>
                         </div>
                     </div>
                     <div class="panel">
-                        <div class="font-semibold text-base mb-3">Диагностика озвучки</div>
+                        <div class="font-semibold text-base mb-3">Голос озвучки</div>
                         <div class="text-xs text-slate-400 dark:text-slate-500 mb-3">
-                            Покажет, что реально происходит с озвучкой на этом устройстве: есть ли голоса, срабатывает ли произнесение, и если нет — какая именно ошибка.
+                            Автоподбор не всегда угадывает самый качественный голос — можно выбрать вручную из голосов, установленных на устройстве.
                         </div>
-                        <button onclick="runTtsDiagnostics()" class="w-full py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target">Проверить озвучку</button>
+                        <label class="block text-sm mb-1">Английский</label>
+                        <select id="voice-select-en" onchange="updateManualVoice('en', this.value)" class="w-full mb-3 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
+                            <option value="">Авто (подбирается автоматически)</option>
+                            ${voicesList.filter(v => v.lang && v.lang.toLowerCase().startsWith('en')).map(v => `<option value="${escapeHtml(v.name)}" ${manualVoiceEnName === v.name ? 'selected' : ''}>${escapeHtml(v.name)} (${v.lang})</option>`).join('')}
+                        </select>
+                        <label class="block text-sm mb-1">Русский</label>
+                        <select id="voice-select-ru" onchange="updateManualVoice('ru', this.value)" class="w-full mb-3 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
+                            <option value="">Авто (подбирается автоматически)</option>
+                            ${voicesList.filter(v => v.lang && v.lang.toLowerCase().startsWith('ru')).map(v => `<option value="${escapeHtml(v.name)}" ${manualVoiceRuName === v.name ? 'selected' : ''}>${escapeHtml(v.name)} (${v.lang})</option>`).join('')}
+                        </select>
+                        ${voicesList.length === 0 ? '<div class="text-xs text-amber-500 mb-2">Список голосов ещё не загрузился — закройте и снова откройте Настройки.</div>' : ''}
+                        <button onclick="speakWord('Hello, this is a test of the selected voice')" class="w-full py-2.5 rounded-xl border border-teal-600 text-teal-600 dark:text-teal-400 dark:border-teal-400 font-medium text-sm touch-target mb-2">🔊 Прослушать английский</button>
+                        <button onclick="speakWord('Привет, это проверка выбранного голоса')" class="w-full py-2.5 rounded-xl border border-teal-600 text-teal-600 dark:text-teal-400 dark:border-teal-400 font-medium text-sm touch-target">🔊 Прослушать русский</button>
                     </div>
                     <div class="panel">
                         <div class="flex items-center justify-between mb-3">
@@ -4083,7 +4072,12 @@ Back: Красивый</pre>
                 if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
                     window.speechSynthesis.cancel();
                 }
-                const voice = pickBestVoice(voices, langCode, lang);
+                // Ручной выбор пользователя (Настройки → Голос озвучки) имеет
+                // приоритет над автоподбором — он снимает любую неопределённость
+                // из эвристики pickBestVoice.
+                const manualName = lang === 'en' ? manualVoiceEnName : manualVoiceRuName;
+                let voice = manualName ? voices.find(v => v.name === manualName) : null;
+                if (!voice) voice = pickBestVoice(voices, langCode, lang);
                 const utterance = new SpeechSynthesisUtterance(text);
                 if (voice) utterance.voice = voice;
                 utterance.lang = langCode;
@@ -4278,6 +4272,7 @@ Back: Красивый</pre>
             validateAndRepairData();
             await loadStats();
             await loadLimitSettings();
+            await loadTtsVoicePrefs();
             initTheme();
 
             const mediaAvailable = await MediaStore.init();
