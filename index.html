@@ -333,9 +333,9 @@
                 </div>
             </div>
             <div class="flex bg-slate-200 dark:bg-slate-800 rounded-full p-1">
-                <button onclick="setTheme('light')" id="btn-light" class="theme-btn touch-target"><i class="fa-solid fa-sun"></i></button>
-                <button onclick="setTheme('dark')" id="btn-dark" class="theme-btn touch-target"><i class="fa-solid fa-moon"></i></button>
-                <button onclick="setTheme('auto')" id="btn-auto" class="theme-btn touch-target"><i class="fa-solid fa-magic"></i></button>
+                <button onclick="setTheme('light')" id="btn-light" class="theme-btn touch-target" aria-label="Светлая тема" title="Светлая тема"><i class="fa-solid fa-sun"></i></button>
+                <button onclick="setTheme('dark')" id="btn-dark" class="theme-btn touch-target" aria-label="Тёмная тема" title="Тёмная тема"><i class="fa-solid fa-moon"></i></button>
+                <button onclick="setTheme('auto')" id="btn-auto" class="theme-btn touch-target" aria-label="Тема как в системе" title="Тема как в системе"><i class="fa-solid fa-magic"></i></button>
             </div>
         </div>
     </div>
@@ -653,13 +653,9 @@
         }
 
         function validateAndRepairData() {
-            let changed = false;
+            let changed = sanitizeDataStructure();
             const now = new Date().toISOString();
             folders.forEach(folder => {
-                if (!Array.isArray(folder.cards)) {
-                    folder.cards = [];
-                    changed = true;
-                }
                 folder.cards.forEach(card => {
                     let cardChanged = false;
                     if (!card.nextReviewDate || isNaN(new Date(card.nextReviewDate).getTime())) {
@@ -736,8 +732,35 @@
             migrateData();
         }
 
-        function migrateData() {
+        // Отбрасывает заведомо мусорные записи (null, строки, числа) из списка
+        // колод и карточек. Нужна ДВУМ точкам входа — migrateData() при загрузке
+        // и validateAndRepairData() (её же вызывает импорт): обе получают данные
+        // неизвестного качества. Падение на этом этапе означает, что приложение
+        // не стартует вообще (window.onload = init, без перехвата), и починить
+        // изнутри уже нельзя — достаточно одной битой записи в файле бэкапа.
+        function sanitizeDataStructure() {
             let changed = false;
+            const cleanFolders = folders.filter(f => f && typeof f === 'object');
+            if (cleanFolders.length !== folders.length) {
+                folders = cleanFolders;
+                changed = true;
+            }
+            folders.forEach(folder => {
+                if (!Array.isArray(folder.cards)) {
+                    folder.cards = [];
+                    changed = true;
+                }
+                const cleanCards = folder.cards.filter(c => c && typeof c === 'object');
+                if (cleanCards.length !== folder.cards.length) {
+                    folder.cards = cleanCards;
+                    changed = true;
+                }
+            });
+            return changed;
+        }
+
+        function migrateData() {
+            let changed = sanitizeDataStructure();
             let mastered = folders.find(f => f.name === 'Изученные слова' && f.system !== true);
             if (mastered) {
                 mastered.system = true;
@@ -1036,7 +1059,7 @@
         function previewNextDelay(card, grade) {
             const state = card.state || 'new';
             if (state === 'new' || state === 'learning') {
-                const step = card.learningStep || 0;
+                const step = Math.max(0, Math.min(card.learningStep || 0, LEARNING_STEPS_MIN.length - 1));
                 if (grade === 1) return { unit: 'min', value: LEARNING_STEPS_MIN[0] };
                 if (grade === 2) return { unit: 'min', value: LEARNING_STEPS_MIN[step] * 1.5 };
                 if (grade === 3) {
@@ -1049,7 +1072,7 @@
                 return { unit: 'day', value: fsrsIntervalDays(safeStability(fsrsInitialStability(4))) };
             }
             if (state === 'relearning') {
-                const step = card.learningStep || 0;
+                const step = Math.max(0, Math.min(card.learningStep || 0, RELEARN_STEPS_MIN.length - 1));
                 if (grade === 1) return { unit: 'min', value: RELEARN_STEPS_MIN[0] };
                 if (grade === 2) return { unit: 'min', value: RELEARN_STEPS_MIN[step] * 1.5 };
                 const nextStep = step + 1;
@@ -1093,7 +1116,11 @@
             }
 
             if (card.state === 'new' || card.state === 'learning') {
-                const step = card.learningStep || 0;
+                // Зажимаем шаг в границы массива: битый/чужой learningStep (из
+                // бэкапа другой версии, где шагов было больше) иначе даёт
+                // LEARNING_STEPS_MIN[step] === undefined → NaN → невалидную дату
+                // → исключение прямо при нажатии кнопки оценки.
+                const step = Math.max(0, Math.min(card.learningStep || 0, LEARNING_STEPS_MIN.length - 1));
                 if (grade === 1) {
                     card.state = 'learning'; card.learningStep = 0;
                     card.nextReviewDate = addMinutes(now, LEARNING_STEPS_MIN[0]).toISOString();
@@ -1122,7 +1149,7 @@
                     card.nextReviewDate = addDays(now, interval).toISOString();
                 }
             } else if (card.state === 'relearning') {
-                const step = card.learningStep || 0;
+                const step = Math.max(0, Math.min(card.learningStep || 0, RELEARN_STEPS_MIN.length - 1));
                 if (grade === 1) {
                     card.learningStep = 0;
                     card.nextReviewDate = addMinutes(now, RELEARN_STEPS_MIN[0]).toISOString();
@@ -1440,14 +1467,30 @@
                 }
                 });
             });
-            const percentCorrect = totalReps > 0 ? Math.max(0, Math.round((1 - totalLapses / totalReps) * 100)) : null;
+            // Доля верных ответов считается по подневной статистике, где на
+            // каждое нажатие пишется и сам ответ, и признак верного (оценка
+            // "Хорошо" и выше). Раньше здесь было 1 - провалы/повторы, но
+            // провалы засчитываются ТОЛЬКО карточкам, дошедшим до полноценных
+            // повторений, а делилось на все нажатия подряд, включая шаги
+            // обучения. Из-за этого двадцать нажатий "Снова" на новых словах
+            // оставляли показатель на 100% — то есть цифра рапортовала об
+            // успехе ровно тогда, когда человеку тяжелее всего.
+            let answeredTotal = 0, answeredCorrect = 0;
+            const daily = stats.dailyStats || {};
+            Object.keys(daily).forEach(key => {
+                const day = daily[key];
+                if (!day) return;
+                answeredTotal += day.total || 0;
+                answeredCorrect += day.correct || 0;
+            });
+            const percentCorrect = answeredTotal > 0 ? Math.round((answeredCorrect / answeredTotal) * 100) : null;
             const avgStability = stabilityCount > 0 ? (stabilitySum / stabilityCount) : null;
             const learnedCount = statReview + statRelearning;
             const todayStats = getTodayStats();
             const masteredCount = (folders.find(f => f.system) || { cards: [] }).cards.length;
             const maxInterval = Math.round(maxRealizedInterval);
 
-            return { total, statNew, statLearning, statReview, statRelearning, totalReps, totalLapses, percentCorrect, avgStability, learnedCount, totalImages, totalFlips, maxConsecutiveCorrect, todayStats, masteredCount, maxInterval, cardsWithStabilityOver100, leechCount };
+            return { total, statNew, statLearning, statReview, statRelearning, totalReps, totalLapses, percentCorrect, answeredTotal, answeredCorrect, avgStability, learnedCount, totalImages, totalFlips, maxConsecutiveCorrect, todayStats, masteredCount, maxInterval, cardsWithStabilityOver100, leechCount };
         }
 
         function showLeechList() {
@@ -1511,7 +1554,7 @@
             // ---- Качество FSRS ----
             { id: 'long_memory_90', icon: '🧠', title: 'Долгая память', desc: 'Довести интервал повторения слова до 90 дней', category: 'Интенсивность', check: (g) => g.maxInterval >= 90 },
             { id: 'stable_foundation', icon: '🏛️', title: 'Крепкий фундамент', desc: 'Довести стабильность слова выше 100', category: 'Интенсивность', check: (g) => g.cardsWithStabilityOver100 >= 1 },
-            { id: 'accuracy_90', icon: '🎯', title: 'Меткость', desc: 'Точность 90%+ (не менее 50 повторений)', category: 'Точность', check: (g) => g.totalReps >= 50 && g.percentCorrect !== null && g.percentCorrect >= 90 },
+            { id: 'accuracy_90', icon: '🎯', title: 'Меткость', desc: 'Точность 90%+ (не менее 50 ответов)', category: 'Точность', check: (g) => g.answeredTotal >= 50 && g.percentCorrect !== null && g.percentCorrect >= 90 },
 
             // ---- Психология ----
             { id: 'comeback', icon: '🌅', title: 'Возвращение', desc: 'Вернуться к занятиям после перерыва в 3+ дня', category: 'Особые', check: () => daysSincePreviousStudy() >= 3 },
@@ -1676,6 +1719,7 @@
                         <div class="stat-card">
                             <div class="text-3xl font-bold text-emerald-500">${g.percentCorrect !== null ? g.percentCorrect + '%' : '—'}</div>
                             <div class="stat-label">верных ответов</div>
+                            ${g.answeredTotal > 0 ? `<div class="text-xs text-slate-400 mt-0.5">${g.answeredCorrect} из ${g.answeredTotal}</div>` : ''}
                         </div>
                         <div class="stat-card">
                             <div class="text-3xl font-bold text-indigo-500">${g.avgStability !== null ? g.avgStability.toFixed(1) : '—'}</div>
@@ -1950,7 +1994,12 @@
             const results = [];
             folders.forEach(folder => {
                 folder.cards.forEach(card => {
-                    if (card.english.toLowerCase().includes(q) || card.russian.toLowerCase().includes(q)) {
+                    // Приводим к строке: карточка без слова или перевода (из
+                    // битого бэкапа) иначе роняла поиск целиком — он просто
+                    // переставал что-либо находить, без видимой причины.
+                    const eng = (card.english || '').toLowerCase();
+                    const rus = (card.russian || '').toLowerCase();
+                    if (eng.includes(q) || rus.includes(q)) {
                         results.push({ ...card, folderName: folder.name, folderId: folder.id });
                     }
                 });
@@ -1984,7 +2033,7 @@
                     </div>
                     <div class="mb-3">
                         <div class="relative">
-                            <input type="text" id="search-input" placeholder="Поиск по всем колодам..." class="w-full px-4 py-3 pl-10 rounded-2xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 text-base touch-target" value="${initialQuery}">
+                            <input type="text" id="search-input" placeholder="Поиск по всем колодам..." class="w-full px-4 py-3 pl-10 rounded-2xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 text-base touch-target" value="${escapeHtml(initialQuery)}">
                             <i class="fa-solid fa-search absolute left-3 top-3.5 text-slate-400"></i>
                         </div>
                     </div>
@@ -2429,17 +2478,22 @@
             if (ids.length === 0) return;
             const ok = await showConfirmModal('Удалить карточки', `Удалить ${ids.length} карточек? Это действие необратимо.`, { danger: true });
             if (!ok) return;
-            const folder = getCurrentFolder();
+            // Ищем каждую карточку явно, как в bulkMoveSelectedCards и
+            // moveSelectedCardsToMastered: опора на "текущую" колоду сломается,
+            // если множественный выбор когда-нибудь появится в кросс-колодном
+            // списке (поиск, общий список) — удаление молча не сработает.
+            let deleted = 0;
             for (const id of ids) {
-                const card = folder.cards.find(c => c.id === id);
-                if (!card) continue;
+                const { card, folder: sourceFolder } = findCardAndFolderById(id);
+                if (!card || !sourceFolder) continue;
                 if (card._imageObjectUrl) URL.revokeObjectURL(card._imageObjectUrl);
                 if (card.imageId) await MediaStore.deleteImage(card.imageId);
+                sourceFolder.cards = sourceFolder.cards.filter(c => c.id !== id);
+                deleted++;
             }
-            folder.cards = folder.cards.filter(c => !ids.includes(c.id));
             await saveData();
             dueCards = dueCards.filter(c => !ids.includes(c.id));
-            await showAlertModal('Готово', `Удалено ${ids.length} карточек.`);
+            await showAlertModal('Готово', `Удалено ${deleted} карточек.`);
             exitSelectionMode();
         }
 
@@ -3406,9 +3460,14 @@
             }
             if (cards.length === 0) {
                 const sepPattern = /\s-\s|[—–:→=>]\s*/;
+                // Строки вида "Front: ..." / "Back: ..." — это заголовки формата,
+                // а не пара "слово: перевод". Без этой проверки обрывок вроде
+                // одинокого "Front: Hello" (например, ответ нейросети оборвался)
+                // превращался запасным разбором в карточку «Front» → «Hello».
+                const headerPattern = /^\*{0,2}(Front|Back):/i;
                 for (const line of lines) {
                     const t = line.trim();
-                    if (!t) continue;
+                    if (!t || headerPattern.test(t)) continue;
                     const sepMatch = t.match(sepPattern);
                     if (sepMatch) {
                         const idx = t.indexOf(sepMatch[0]);
@@ -3424,9 +3483,10 @@
                 }
             }
             if (cards.length === 0) {
+                const headerPattern = /^\*{0,2}(Front|Back):/i;
                 const blocks = trimmed.split(/\n\s*\n/);
                 for (const block of blocks) {
-                    const bl = block.split('\n').map(l => l.trim()).filter(Boolean);
+                    const bl = block.split('\n').map(l => l.trim()).filter(l => l && !headerPattern.test(l));
                     if (bl.length >= 2) cards.push({ english: bl[0], russian: bl[1] });
                 }
             }
@@ -3622,6 +3682,13 @@ Back: Красивый</pre>
                         }
                     }
                     delete card.imageId; // критично: иначе на другом устройстве миграция base64→кэш не сработает
+                    delete card._imageObjectUrl; // временная blob-ссылка на картинку в памяти, вне сессии мертва — мусор в бэкапе
+                    // folderId/folderName пишутся на карточку при старте обучения
+                    // только ради значка колоды на экране. В файле это дубль —
+                    // колода и так известна из структуры, а копия может устареть
+                    // после переименования или переноса карточки.
+                    delete card.folderId;
+                    delete card.folderName;
                 }
             }
 
