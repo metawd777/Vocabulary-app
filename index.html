@@ -674,6 +674,15 @@
                                            (card.stability === undefined || card.stability === null);
                     const looksNew = !hasValidState || card.state === 'new' || looksCorrupted;
                     if (looksNew) {
+                        // Снимок ДО нормализации: помечать данные изменёнными
+                        // нужно только если что-то действительно изменилось.
+                        // Иначе любая новая карточка объявлялась «исправленной»
+                        // при каждом запуске — а у пользователя с сотнями новых
+                        // слов это переписывало всю базу на каждый старт и
+                        // печатало ложное сообщение о починке.
+                        const before = JSON.stringify([card.state, card.reps, card.stability,
+                            card.difficulty, card.learningStep, card.lastGrade, card.last_review,
+                            card.nextReviewDate, card.masteredSuggestionDismissed]);
                         card.state = 'new';
                         card.reps = 0;
                         card.lapses = card.lapses || 0;
@@ -682,9 +691,15 @@
                         delete card.learningStep;
                         delete card.lastGrade;
                         card.last_review = null;
-                        card.nextReviewDate = now;
-                        card.masteredSuggestionDismissed = false;
-                        cardChanged = true;
+                        // Дату трогаем только если она в будущем: новая карточка
+                        // должна быть доступна сразу, а уже прошедшая дата этому
+                        // не мешает и переписывать её незачем.
+                        if (new Date(card.nextReviewDate).getTime() > Date.now()) card.nextReviewDate = now;
+                        card.masteredSuggestionDismissed = card.masteredSuggestionDismissed || false;
+                        const after = JSON.stringify([card.state, card.reps, card.stability,
+                            card.difficulty, card.learningStep, card.lastGrade, card.last_review,
+                            card.nextReviewDate, card.masteredSuggestionDismissed]);
+                        if (before !== after) cardChanged = true;
                     } else {
                         card.stability = safeStability(card.stability);
                         card.difficulty = safeDifficulty(card.difficulty);
@@ -1093,7 +1108,12 @@
         function formatIntervalPreview({ unit, value }) {
             if (unit === 'min') {
                 const mins = Math.round(value);
-                return mins < 60 ? `${mins} мин` : `${Math.round(mins / 60)} ч`;
+                if (mins < 60) return `${mins} мин`;
+                // Округление до целых часов врало: 90 минут показывались как
+                // «2 ч». Показываем дробную часть, когда она есть.
+                const hours = mins / 60;
+                const rounded = Math.round(hours * 10) / 10;
+                return Number.isInteger(rounded) ? `${rounded} ч` : `${String(rounded).replace('.', ',')} ч`;
             }
             const days = Math.max(1, Math.round(value));
             if (days < 30) return `~${days} дн.`;
@@ -1105,7 +1125,12 @@
             const now = new Date();
             if (!card.state) card.state = 'new';
             const wasNew = card.state === 'new'; // фиксируем ДО мутации — нужно для честного учёта дневного лимита
-            const wasPureReview = card.state === 'review' || card.state === 'relearning';
+            // Счётчик режима «Только повторения» обязан считать ровно то, что
+            // этот режим показывает, — то есть всё, кроме новых карточек
+            // (см. фильтр в applyDailyLimit). Если считать только review и
+            // relearning, карточки на шагах обучения проходят мимо лимита:
+            // показываются, но не расходуют его, и потолок не срабатывает.
+            const countsTowardReviewLimit = card.state !== 'new';
             if (typeof card.reps === 'undefined') card.reps = 0;
             if (typeof card.lapses === 'undefined') card.lapses = 0;
             card.reps++;
@@ -1221,7 +1246,7 @@
                 if (!stats.pureReviewsShownToday || stats.pureReviewsShownToday.date !== todayKey) {
                     stats.pureReviewsShownToday = { date: todayKey, count: 0 };
                 }
-                if (wasPureReview) stats.pureReviewsShownToday.count++;
+                if (countsTowardReviewLimit) stats.pureReviewsShownToday.count++;
                 await saveStats();
             }
 
@@ -1312,10 +1337,13 @@
             }
 
             if (secondLimitMode === 'reviews_only') {
-                // Название режима обещает "без новых" — значит новые и изучаемые
-                // (state new/learning) карточки должны быть полностью исключены,
-                // а не просто пропущены мимо лимита-счётчика.
-                result = result.filter(card => card.state === 'review' || card.state === 'relearning');
+                // Режим называется "без новых" — значит убираем ровно НОВЫЕ
+                // карточки. Карточки на шагах обучения (learning) пользователь
+                // уже проходил хотя бы раз, и с его точки зрения это и есть
+                // повторения — прятать их нельзя. Именно из-за этого экран
+                // раньше показывал противоречие: "нет карточек для повторения"
+                // и тут же "следующее повторение — сейчас".
+                result = result.filter(card => card.state !== 'new');
 
                 const todayKey = localDateKey(getEffectiveDate());
                 if (!stats.pureReviewsShownToday || stats.pureReviewsShownToday.date !== todayKey) {
@@ -2690,7 +2718,7 @@
 
             const dueNow = cardsInScope ? getDueCardsFromArray(cardsInScope) : [];
             const hasDueNew = dueNow.some(c => c.state === 'new');
-            const hasDuePureReview = dueNow.some(c => c.state === 'review' || c.state === 'relearning');
+            const hasDuePureReview = dueNow.some(c => c.state !== 'new');
             const todayKeyEff = localDateKey(getEffectiveDate());
             const newRemaining = dailyLimitEnabled
                 ? Math.max(0, dailyLimitCount - (stats.newShownToday && stats.newShownToday.date === todayKeyEff ? stats.newShownToday.count : 0))
@@ -3834,7 +3862,7 @@ Back: Красивый</pre>
                             <input type="number" id="review-limit-count" value="${dailyReviewLimitCount}" min="1" max="9999" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" onchange="updateReviewLimitCount(this.value)">
                         </div>
                         <div class="text-xs text-slate-400 dark:text-slate-500 mt-2">
-                            «Только повторения» показывает только слова со статусом «На повторении»/«Переучиваются» — новые слова и карточки на шагах обучения на это время скрываются полностью. «Общее число» — жёсткий потолок вообще на всё, включая ещё не законченные шаги обучения.
+                            «Только повторения» скрывает новые слова, но показывает всё, что вы уже проходили — и карточки на шагах обучения, и полноценные повторения. «Общее число» — жёсткий потолок вообще на всё, включая новые слова.
                         </div>
                     </div>
                     <div class="panel">
