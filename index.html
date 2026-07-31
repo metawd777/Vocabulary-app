@@ -495,6 +495,10 @@
         let editContext = 'folder';
         let stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 }, reviewsShownToday: { date: null, count: 0 }, pureReviewsShownToday: { date: null, count: 0 } };
         let lastReviewedCard = null;
+        // Если чтение колод с диска не удалось, запись ЗАПРЕЩЕНА: иначе пустая
+        // заготовка затрёт уцелевшие данные. Ровно так и терялись все колоды —
+        // одна неудачная попытка чтения приводила к необратимой перезаписи.
+        let dataLoadFailed = false;
         let undoStack = [];
         let dailyLimitEnabled = false;
         let dailyLimitCount = 20;
@@ -729,22 +733,45 @@
         const debouncedSaveData = debounce(() => { saveData(); }, 450);
 
         async function loadData() {
+            const emptyStarter = () => [{ id: 'default', name: 'Основная колода', cards: [] }];
             try {
                 const stored = await localforage.getItem('folders');
                 if (stored && Array.isArray(stored) && stored.length > 0) {
                     folders = stored;
+                    lastKnownCardCount = countAllCards(folders);
                 } else {
-                    folders = [{ id: 'default', name: 'Основная колода', cards: [] }];
-                    await localforage.setItem('folders', folders);
+                    // КРИТИЧНО: раньше здесь безусловно писалась пустая колода
+                    // поверх ключа — и одна неудачная попытка чтения необратимо
+                    // уничтожала все колоды пользователя. Теперь сначала
+                    // выясняем, это чистая установка или чтение подвело: если
+                    // ключ на диске есть, а прочитать не вышло — данные там
+                    // есть, трогать их нельзя ни в коем случае.
+                    let keyExists = false;
+                    try {
+                        const keys = await localforage.keys();
+                        keyExists = Array.isArray(keys) && keys.includes('folders');
+                    } catch (keysError) {
+                        console.warn('Не удалось перечислить ключи хранилища:', keysError);
+                        keyExists = true; // при сомнении считаем, что данные есть
+                    }
+                    folders = emptyStarter();
+                    if (keyExists) {
+                        dataLoadFailed = true;
+                    } else {
+                        await localforage.setItem('folders', folders); // честно первый запуск
+                    }
                 }
                 if (!folders.some(f => f.id === currentFolderId)) {
                     currentFolderId = folders[0].id;
                 }
             } catch (e) {
                 console.warn('Ошибка загрузки', e);
-                folders = [{ id: 'default', name: 'Основная колода', cards: [] }];
+                folders = emptyStarter();
+                dataLoadFailed = true;
             }
-            migrateData();
+            // Миграции меняют данные и сами вызывают сохранение — при неудачном
+            // чтении запускать их нельзя.
+            if (!dataLoadFailed) migrateData();
         }
 
         // Отбрасывает заведомо мусорные записи (null, строки, числа) из списка
@@ -804,9 +831,92 @@
             if (changed) saveData();
         }
 
+        // ==================== АВТОМАТИЧЕСКИЕ РЕЗЕРВНЫЕ КОПИИ ====================
+        // Хранятся ОТДЕЛЬНЫМ ключом от основных данных. Смысл в том, что любой
+        // сбой основного ключа (неудачное чтение, ошибка записи, повреждение)
+        // больше не означает тотальную потерю: рядом всегда лежит несколько
+        // последних снимков, из которых можно восстановиться прямо в приложении.
+        // Картинки в снимок не входят (карточки хранят только ссылку на них),
+        // поэтому один снимок — это сотни килобайт текста, не больше.
+        const SNAPSHOT_KEY = 'folders_snapshots';
+        const MAX_SNAPSHOTS = 5;
+        const SNAPSHOT_MIN_INTERVAL_MS = 4 * 60 * 60 * 1000; // авто-снимок не чаще раза в 4 часа
+
+        function countAllCards(list) {
+            return (list || []).reduce((sum, f) => sum + (f && Array.isArray(f.cards) ? f.cards.length : 0), 0);
+        }
+
+        async function getSnapshots() {
+            try {
+                const stored = await localforage.getItem(SNAPSHOT_KEY);
+                return Array.isArray(stored) ? stored : [];
+            } catch (e) {
+                console.warn('Не удалось прочитать резервные копии:', e);
+                return [];
+            }
+        }
+
+        // reason: 'auto' — плановый снимок; любая другая строка — перед опасной
+        // операцией (импорт, удаление колоды, сброс прогресса) и создаётся всегда.
+        async function createSnapshot(reason) {
+            if (dataLoadFailed) return;              // при сбое чтения снимать нечего
+            const cardCount = countAllCards(folders);
+            if (cardCount === 0) return;             // пустое состояние не бэкапим никогда
+            try {
+                const snapshots = await getSnapshots();
+                const newest = snapshots[0];
+                if (reason === 'auto' && newest && (Date.now() - newest.ts) < SNAPSHOT_MIN_INTERVAL_MS) return;
+                const copy = JSON.parse(JSON.stringify(folders));
+                copy.forEach(f => (f.cards || []).forEach(c => { delete c._imageObjectUrl; }));
+                snapshots.unshift({ ts: Date.now(), reason, cardCount, folderCount: copy.length, data: copy });
+                await localforage.setItem(SNAPSHOT_KEY, snapshots.slice(0, MAX_SNAPSHOTS));
+            } catch (e) {
+                // Нехватка места не должна ломать работу приложения — просто
+                // сообщаем в журнал и продолжаем.
+                console.warn('Не удалось создать резервную копию:', e);
+            }
+        }
+
+        // Сколько карточек было на момент последней успешной загрузки/сохранения.
+        // Служит опорой для проверки перед записью: массовая пропажа карточек
+        // без явного удаления пользователем — почти наверняка сбой, а не намерение.
+        let lastKnownCardCount = null;
+        // Поднимается на время намеренных удалений (удаление колоды, карточек,
+        // сброс прогресса, замена данных при импорте), чтобы проверка ниже не
+        // мешала пользователю делать то, что он осознанно попросил.
+        let intentionalBulkChange = false;
+
+        async function withIntentionalChange(fn) {
+            intentionalBulkChange = true;
+            try { return await fn(); }
+            finally { intentionalBulkChange = false; }
+        }
+
         async function saveData() {
+            // Первый рубеж: если колоды не загрузились, в памяти лежит пустая
+            // заготовка. Записать её — значит уничтожить то, что уцелело на диске.
+            if (dataLoadFailed) {
+                console.warn('Сохранение заблокировано: колоды не были загружены корректно');
+                return;
+            }
+            // Второй рубеж: внезапное массовое исчезновение карточек.
+            const nowCount = countAllCards(folders);
+            if (!intentionalBulkChange && lastKnownCardCount !== null &&
+                lastKnownCardCount >= 10 && nowCount < Math.floor(lastKnownCardCount / 2)) {
+                console.error(`Сохранение заблокировано: карточек было ${lastKnownCardCount}, стало ${nowCount}`);
+                await showAlertModal(
+                    'Сохранение остановлено',
+                    `Приложение обнаружило, что число карточек внезапно упало с ${lastKnownCardCount} до ${nowCount}, ` +
+                    'хотя вы ничего не удаляли. Запись на диск остановлена, чтобы не потерять данные.\n\n' +
+                    'Закройте приложение полностью и откройте заново. Если карточки не вернутся — ' +
+                    'воспользуйтесь восстановлением из резервной копии в настройках.'
+                );
+                dataLoadFailed = true; // дальнейшие записи тоже блокируем
+                return;
+            }
             try {
                 await localforage.setItem('folders', folders);
+                lastKnownCardCount = nowCount;
             } catch (e) {
                 console.error('Ошибка сохранения:', e);
                 if (e.name === 'QuotaExceededError' || (e.code === 22)) {
@@ -825,8 +935,18 @@
         // повторит попытку при следующем действии, а модалка посреди чужого
         // системного диалога всё равно не поможет пользователю — только напугает.
         async function saveDataSilent() {
+            if (dataLoadFailed) return;
+            const nowCount = countAllCards(folders);
+            // Тот же рубеж, что и в saveData: фоновое сохранение (уход в фон,
+            // закрытие вкладки) не должно молча закрепить массовую пропажу.
+            if (!intentionalBulkChange && lastKnownCardCount !== null &&
+                lastKnownCardCount >= 10 && nowCount < Math.floor(lastKnownCardCount / 2)) {
+                console.error('Фоновое сохранение заблокировано: резкое падение числа карточек');
+                return;
+            }
             try {
                 await localforage.setItem('folders', folders);
+                lastKnownCardCount = nowCount;
             } catch (e) {
                 console.warn('Фоновое сохранение не удалось (не критично, будет повторено):', e);
             }
@@ -1844,20 +1964,22 @@
         }
 
         async function confirmReturnCard(cardId, targetFolderId, btnElement) {
-            const modal = btnElement.closest('.fixed');
+            // Элемент кнопки может отсутствовать (вызов не из разметки) —
+            // тогда закрывать нечего, но сама операция должна пройти.
+            const modal = btnElement ? btnElement.closest('.fixed') : null;
             const masteredFolder = getMasteredFolder();
             const targetFolder = folders.find(f => f.id === targetFolderId);
             const card = masteredFolder.cards.find(c => c.id === cardId);
             if (!card || !targetFolder) return;
             if (targetFolder.cards.some(c => c.id === cardId)) {
                 await showAlertModal('Информация', 'Эта карточка уже есть в выбранной колоде');
-                modal.remove();
+                if (modal) modal.remove();
                 return;
             }
             masteredFolder.cards = masteredFolder.cards.filter(c => c.id !== cardId);
             targetFolder.cards.push(card);
             await saveData();
-            modal.remove();
+            if (modal) modal.remove();
             closeEditModalAndReturn();
         }
 
@@ -2510,6 +2632,7 @@
             // moveSelectedCardsToMastered: опора на "текущую" колоду сломается,
             // если множественный выбор когда-нибудь появится в кросс-колодном
             // списке (поиск, общий список) — удаление молча не сработает.
+            await createSnapshot('перед групповым удалением карточек');
             let deleted = 0;
             for (const id of ids) {
                 const { card, folder: sourceFolder } = findCardAndFolderById(id);
@@ -2519,7 +2642,7 @@
                 sourceFolder.cards = sourceFolder.cards.filter(c => c.id !== id);
                 deleted++;
             }
-            await saveData();
+            await withIntentionalChange(() => saveData());
             dueCards = dueCards.filter(c => !ids.includes(c.id));
             await showAlertModal('Готово', `Удалено ${deleted} карточек.`);
             exitSelectionMode();
@@ -3641,6 +3764,62 @@
             await saveTtsVoicePrefs();
         }
 
+        // Экран восстановления. Показывает все снимки с датой, числом карточек
+        // и причиной создания, чтобы можно было осознанно выбрать нужный.
+        async function showBackupsModal() {
+            const snapshots = await getSnapshots();
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black/50 flex items-end justify-center z-50';
+            const rows = snapshots.length === 0
+                ? '<div class="text-sm text-slate-500 dark:text-slate-400 py-4">Резервных копий пока нет. Первая создастся автоматически при следующем запуске приложения.</div>'
+                : snapshots.map((s, i) => {
+                    const d = new Date(s.ts);
+                    const when = d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    return `<div class="flex items-center justify-between gap-3 py-3 border-b border-slate-200 dark:border-slate-700">
+                        <div class="min-w-0">
+                            <div class="font-medium text-sm">${when}</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">${s.cardCount} карточек, колод: ${s.folderCount || '—'} · ${escapeHtml(s.reason || 'авто')}</div>
+                        </div>
+                        <button onclick="restoreSnapshot(${i})" class="shrink-0 px-4 py-2 rounded-xl bg-teal-600 text-white text-sm font-medium touch-target">Восстановить</button>
+                    </div>`;
+                }).join('');
+            modal.innerHTML = `
+                <div class="bg-white dark:bg-slate-800 rounded-t-3xl w-full max-w-lg p-5 pb-8 max-h-[85vh] overflow-auto">
+                    <h3 class="text-lg font-semibold mb-1">Резервные копии</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">Создаются автоматически при запуске и перед опасными действиями. Хранятся последние ${MAX_SNAPSHOTS}.</p>
+                    ${rows}
+                    <button onclick="this.closest('.fixed').remove()" class="w-full mt-5 py-3 rounded-xl bg-slate-200 dark:bg-slate-700 font-medium touch-target">Закрыть</button>
+                </div>`;
+            document.body.appendChild(modal);
+        }
+
+        async function restoreSnapshot(index) {
+            const snapshots = await getSnapshots();
+            const snap = snapshots[index];
+            if (!snap || !Array.isArray(snap.data)) {
+                await showAlertModal('Ошибка', 'Резервная копия недоступна или повреждена.');
+                return;
+            }
+            const current = countAllCards(folders);
+            const ok = await showConfirmModal(
+                'Восстановить из копии',
+                `Заменить текущие данные (${current} карточек) копией от ${new Date(snap.ts).toLocaleString('ru-RU')} (${snap.cardCount} карточек)?\n\n` +
+                'Текущее состояние будет сохранено в отдельную копию, так что это действие можно будет отменить.',
+                { confirmLabel: 'Восстановить' }
+            );
+            if (!ok) return;
+            await createSnapshot('состояние до восстановления');
+            folders = JSON.parse(JSON.stringify(snap.data));
+            if (!folders.some(f => f.id === currentFolderId)) currentFolderId = folders[0]?.id || 'default';
+            dataLoadFailed = false; // восстановление снимает блокировку записи
+            validateAndRepairData();
+            await withIntentionalChange(() => saveData());
+            lastKnownCardCount = countAllCards(folders);
+            document.querySelectorAll('.fixed').forEach(el => el.remove());
+            await showAlertModal('Готово', `Восстановлено ${countAllCards(folders)} карточек.`);
+            showFoldersView();
+        }
+
         function showImportHelpModal() {
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]';
@@ -3788,6 +3967,9 @@ Back: Красивый</pre>
                 }
                 const choice = await showImportChoiceModal();
                 if (choice === null) return;
+                // Снимок ДО любых изменений: импорт — самая опасная операция,
+                // «замена» стирает всё содержимое разом.
+                await createSnapshot(choice === 'replace' ? 'перед заменой при импорте' : 'перед импортом');
                 if (choice === 'replace') {
                     folders = imported;
                     const resetStatsToo = await showConfirmModal(
@@ -3806,7 +3988,8 @@ Back: Красивый</pre>
                 deduplicateSystemFolders();
                 validateAndRepairData();
                 await migrateOldBase64Images();
-                await saveData();
+                await withIntentionalChange(() => saveData());
+                lastKnownCardCount = countAllCards(folders);
                 await showAlertModal('Готово', 'Данные успешно импортированы');
                 showFoldersView();
                 await checkAchievements();
@@ -3916,6 +4099,13 @@ Back: Красивый</pre>
                         ${voicesList.length === 0 ? '<div class="text-xs text-amber-500 mb-2">Список голосов ещё не загрузился — закройте и снова откройте Настройки.</div>' : ''}
                         <button onclick="speakWord('Hello, this is a test of the selected voice')" class="w-full py-2.5 rounded-xl border border-teal-600 text-teal-600 dark:text-teal-400 dark:border-teal-400 font-medium text-sm touch-target mb-2">🔊 Прослушать английский</button>
                         <button onclick="speakWord('Привет, это проверка выбранного голоса')" class="w-full py-2.5 rounded-xl border border-teal-600 text-teal-600 dark:text-teal-400 dark:border-teal-400 font-medium text-sm touch-target">🔊 Прослушать русский</button>
+                    </div>
+                    <div class="panel">
+                        <div class="font-semibold text-base mb-3">Резервные копии</div>
+                        <div class="text-xs text-slate-400 dark:text-slate-500 mb-3">
+                            Приложение само сохраняет несколько последних снимков ваших колод — при запуске и перед любым опасным действием. Отсюда их можно восстановить.
+                        </div>
+                        <button onclick="showBackupsModal()" class="w-full py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target">Открыть резервные копии</button>
                     </div>
                     <div class="panel">
                         <div class="flex items-center justify-between mb-3">
@@ -4051,8 +4241,9 @@ Back: Красивый</pre>
             if (!folder) return;
             const ok = await showConfirmModal('Сбросить прогресс колоды', `Сбросить прогресс всех слов в колоде «${folder.name}»?`, { confirmLabel: 'Сбросить' });
             if (!ok) return;
+            await createSnapshot('перед сбросом прогресса колоды');
             folder.cards.forEach(c => resetCardProgress(c));
-            await saveData();
+            await withIntentionalChange(() => saveData());
             await showAlertModal('Готово', `Прогресс в колоде «${folder.name}» сброшен`);
             if (currentFolderId === folderId) {
                 showFolderCards(folderId);
@@ -4064,10 +4255,11 @@ Back: Красивый</pre>
         async function resetAllProgress() {
             const ok = await showConfirmModal('Сбросить весь прогресс', 'Сбросить прогресс ВСЕХ слов во всех колодах?', { confirmLabel: 'Сбросить всё' });
             if (!ok) return;
+            await createSnapshot('перед сбросом всего прогресса');
             folders.forEach(folder => {
                 folder.cards.forEach(c => resetCardProgress(c));
             });
-            await saveData();
+            await withIntentionalChange(() => saveData());
             await showAlertModal('Готово', 'Прогресс всех колод сброшен');
             showFoldersView();
         }
@@ -4078,6 +4270,7 @@ Back: Красивый</pre>
                 await showAlertModal('Ошибка', 'Колоду «Изученные слова» нельзя удалить — в ней хранится прогресс по выученным словам.');
                 return;
             }
+            await createSnapshot('перед удалением колоды');
             if (folder && folder.cards) {
                 for (const card of folder.cards) {
                     if (card._imageObjectUrl) URL.revokeObjectURL(card._imageObjectUrl);
@@ -4086,7 +4279,7 @@ Back: Красивый</pre>
             }
             folders = folders.filter(f => f.id !== folderId);
             if (folders.length > 0) currentFolderId = folders[0].id;
-            await saveData();
+            await withIntentionalChange(() => saveData());
             showFoldersView();
         }
 
@@ -4364,7 +4557,10 @@ Back: Красивый</pre>
             loadVoices();
 
             await loadData();
-            validateAndRepairData();
+            if (!dataLoadFailed) {
+                validateAndRepairData();
+                createSnapshot('auto'); // плановая резервная копия, без ожидания
+            }
             await loadStats();
             await loadLimitSettings();
             await loadTtsVoicePrefs();
@@ -4379,6 +4575,20 @@ Back: Красивый</pre>
             document.getElementById('current-folder-name').textContent = 'Мои колоды';
             showFoldersView();
             await checkAchievements();
+
+            // Если колоды не прочитались — данные на диске, скорее всего, целы,
+            // но приложение их не видит. Молчать нельзя: пользователь решит, что
+            // всё пропало, начнёт что-то делать и затрёт уцелевшее. Запись при
+            // этом уже заблокирована (см. saveData).
+            if (dataLoadFailed) {
+                await showAlertModal(
+                    'Не удалось прочитать колоды',
+                    'Данные, скорее всего, целы на устройстве, но приложение не смогло их прочитать. ' +
+                    'Сохранение временно отключено, чтобы ничего не затереть.\n\n' +
+                    'Закройте приложение полностью и откройте заново. Если колоды не вернутся — ' +
+                    'восстановите их из файла резервной копии через импорт.'
+                );
+            }
 
             // Устанавливаем обработчик Escape (без дублирования)
             setupEscapeHandler();
