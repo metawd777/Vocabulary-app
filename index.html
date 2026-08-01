@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="referrer" content="no-referrer">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
@@ -340,10 +340,10 @@
         </div>
     </div>
 
-    <div id="main-content" class="max-w-3xl mx-auto w-full"></div>
+    <main id="main-content" class="max-w-3xl mx-auto w-full"></main>
 
     <!-- Нижняя навигация -->
-    <div class="bottom-nav max-w-3xl mx-auto w-full">
+    <nav class="bottom-nav max-w-3xl mx-auto w-full" aria-label="Основная навигация">
         <div class="grid grid-cols-4 text-center py-1 text-xs">
             <button onclick="showFoldersView()" id="nav-folders" class="nav-btn">
                 <i class="fa-solid fa-folder text-xl mb-0.5"></i><span>Колоды</span>
@@ -358,7 +358,7 @@
                 <i class="fa-solid fa-gear text-xl mb-0.5"></i><span>Настройки</span>
             </button>
         </div>
-    </div>
+    </nav>
 
     <!-- Модалки (оставлены из предыдущей версии) -->
     <div id="cardViewModal" onclick="hideCardViewModal()" class="modal-overlay hidden flex">
@@ -389,10 +389,10 @@
             <div class="font-semibold text-xl mb-4">Редактировать карточку</div>
             <div class="space-y-3">
                 <div><label class="block text-sm mb-1">Передняя сторона</label>
-                    <textarea id="edit-english" class="field-input touch-target text-base" rows="2"></textarea>
+                    <textarea id="edit-english" aria-label="Передняя сторона карточки" class="field-input touch-target text-base" rows="2"></textarea>
                 </div>
                 <div><label class="block text-sm mb-1">Обратная сторона</label>
-                    <textarea id="edit-russian" class="field-input touch-target text-base" rows="2"></textarea>
+                    <textarea id="edit-russian" aria-label="Обратная сторона карточки" class="field-input touch-target text-base" rows="2"></textarea>
                 </div>
             </div>
             <div class="mt-4">
@@ -409,17 +409,17 @@
                     ⚠️ Ручное изменение может сбить график повторений — трогайте, только если понимаете, что делаете.
                 </p>
                 <div class="pt-3 grid grid-cols-2 gap-3">
-                    <div><label class="block text-xs mb-1">Стабильность</label><input type="number" step="0.01" id="edit-stability" class="field-input"></div>
-                    <div><label class="block text-xs mb-1">Сложность</label><input type="number" step="0.01" id="edit-difficulty" class="field-input"></div>
+                    <div><label class="block text-xs mb-1">Стабильность</label><input type="number" step="0.01" id="edit-stability" aria-label="Стабильность памяти" class="field-input"></div>
+                    <div><label class="block text-xs mb-1">Сложность</label><input type="number" step="0.01" id="edit-difficulty" aria-label="Сложность карточки" class="field-input"></div>
                     <div><label class="block text-xs mb-1">Статус</label>
-                        <select id="edit-state" class="field-input">
+                        <select id="edit-state" aria-label="Состояние карточки" class="field-input">
                             <option value="new">Новая</option>
                             <option value="learning">Изучается</option>
                             <option value="review">На повторении</option>
                             <option value="relearning">Переучивается</option>
                         </select>
                     </div>
-                    <div><label class="block text-xs mb-1">След. повторение</label><input type="date" id="edit-next-date" class="field-input"></div>
+                    <div><label class="block text-xs mb-1">След. повторение</label><input type="date" id="edit-next-date" aria-label="Дата следующего повторения" class="field-input"></div>
                 </div>
             </details>
             <button id="mastered-action-btn" class="mt-3 w-full py-3 rounded-xl border flex items-center justify-center gap-x-2 text-sm touch-target" style="display:none;"></button>
@@ -436,10 +436,10 @@
             <div class="font-semibold text-xl mb-4">Добавить слово</div>
             <div class="space-y-3">
                 <div><label class="block text-sm mb-1">Передняя сторона</label>
-                    <textarea id="new-english" class="field-input touch-target text-base" rows="2"></textarea>
+                    <textarea id="new-english" aria-label="Передняя сторона новой карточки" class="field-input touch-target text-base" rows="2"></textarea>
                 </div>
                 <div><label class="block text-sm mb-1">Обратная сторона</label>
-                    <textarea id="new-russian" class="field-input touch-target text-base" rows="2"></textarea>
+                    <textarea id="new-russian" aria-label="Обратная сторона новой карточки" class="field-input touch-target text-base" rows="2"></textarea>
                 </div>
             </div>
             <div class="flex items-center gap-x-2 mt-3">
@@ -478,6 +478,13 @@
         localforage.config({ name: 'VocabularyDB', storeName: 'vocab_store' });
 
         // ==================== КОНСТАНТЫ ====================
+        // Версия и дата сборки. Нужны, чтобы можно было убедиться, что открылась
+        // новая версия, а не старая копия из кеша браузера. Именно эта
+        // неизвестность заставляла удалять приложение с экрана — а удаление
+        // уничтожает сохранённые слова.
+        const APP_VERSION = '2026.08.01';
+        const APP_BUILD_LABEL = '1 августа 2026';
+
         const CONSTANTS = {
             MAX_UNDO_STEPS: 5,
             MIN_STUDY_FONT_SCALE: 0.35,
@@ -517,6 +524,104 @@
 
         // ---- Защита Escape ----
         let escapeHandlerAdded = false;
+
+        // Ограничение времени на обращение к хранилищу. Отдельный случай от
+        // ошибки: хранилище может не ответить ВООБЩЕ — ни успехом, ни отказом.
+        // Тогда приложение ждёт бесконечно с пустым экраном, человек решает, что
+        // оно сломалось, и удаляет его — теряя слова. Тайм-аут превращает
+        // зависание в обычный сбой, при котором запись уже заблокирована и
+        // данные на диске остаются нетронутыми.
+        const STORAGE_TIMEOUT_MS = 10000;
+
+        function withStorageTimeout(promise, label) {
+            let timer;
+            const timeout = new Promise((_, reject) => {
+                timer = setTimeout(() => reject(new Error(`Хранилище не ответило за ${STORAGE_TIMEOUT_MS / 1000} с (${label})`)), STORAGE_TIMEOUT_MS);
+            });
+            return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+        }
+
+        // ==================== БЕЗОПАСНЫЙ localStorage ====================
+        // В приватном режиме Safari запись в localStorage выбрасывает
+        // исключение, а при полностью отключённом хранилище падает даже
+        // обращение к самому объекту. Здесь хранятся только мелочи (тема),
+        // поэтому отказ хранилища не должен ронять приложение — просто
+        // настройка не запомнится между запусками.
+        const safeLocalStorage = {
+            get(key) {
+                try { return window.localStorage.getItem(key); }
+                catch (e) { return null; }
+            },
+            set(key, value) {
+                try { window.localStorage.setItem(key, value); return true; }
+                catch (e) { console.warn('localStorage недоступен, настройка не сохранится:', e.name); return false; }
+            },
+            remove(key) {
+                try { window.localStorage.removeItem(key); } catch (e) { /* не критично */ }
+            }
+        };
+
+        // ==================== ЗАЩИТА ХРАНИЛИЩА ====================
+        // Браузер вправе удалить данные сайта, когда на устройстве кончается
+        // место: он вычищает наименее используемые источники целиком — не часть
+        // данных, а всё сразу. Постоянное хранилище (persist) выводит источник
+        // из-под этой чистки. На iOS запрос приходится повторять при каждом
+        // открытии приложения — разрешение не держится между запусками.
+        const StorageGuard = {
+            persisted: null,   // null = ещё не выяснено
+            quota: null,
+            usage: null,
+
+            async requestPersistence() {
+                try {
+                    if (!navigator.storage || !navigator.storage.persist) return null;
+                    if (navigator.storage.persisted) {
+                        this.persisted = await navigator.storage.persisted();
+                        if (this.persisted) return true;
+                    }
+                    this.persisted = await navigator.storage.persist();
+                    return this.persisted;
+                } catch (e) {
+                    console.warn('Не удалось запросить постоянное хранилище:', e);
+                    return null;
+                }
+            },
+
+            async measure() {
+                try {
+                    if (!navigator.storage || !navigator.storage.estimate) return null;
+                    const est = await navigator.storage.estimate();
+                    this.quota = est.quota || null;
+                    this.usage = est.usage || null;
+                    if (!this.quota) return null;
+                    return { usage: this.usage, quota: this.quota, freeRatio: 1 - (this.usage / this.quota) };
+                } catch (e) {
+                    console.warn('Не удалось оценить хранилище:', e);
+                    return null;
+                }
+            },
+
+            // Предупреждаем ЗАРАНЕЕ, а не в момент, когда запись уже провалилась
+            // и данные потерять уже можно.
+            async checkSpaceAndWarn() {
+                const info = await this.measure();
+                if (!info) return;
+                if (info.freeRatio < 0.1) {
+                    await showAlertModal(
+                        'Заканчивается место',
+                        `Хранилище приложения заполнено на ${Math.round((1 - info.freeRatio) * 100)}%.\n\n` +
+                        'Сделайте резервную копию (Настройки → «Сохранить резервную копию») и освободите место на устройстве, ' +
+                        'иначе новые слова и фотографии могут не сохраниться.'
+                    );
+                }
+            },
+
+            formatBytes(bytes) {
+                if (!bytes && bytes !== 0) return '—';
+                if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' КБ';
+                return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
+            }
+        };
 
         // ==================== MEDIA STORE ====================
         const MediaStore = {
@@ -584,7 +689,10 @@
         // ==================== ЭМОДЗИ ====================
         function removeEmojis(text) {
             if (!text) return '';
-            return text.replace(/\p{Extended_Pictographic}/gu, '').trim();
+            // Приводим к строке: в карточке из чужого или битого файла на месте
+            // слова может оказаться число или объект, и тогда работа со строкой
+            // роняет и озвучку, и всё, что вызвано следом.
+            return String(text).replace(/\p{Extended_Pictographic}/gu, '').trim();
         }
 
         // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
@@ -735,9 +843,18 @@
         async function loadData() {
             const emptyStarter = () => [{ id: 'default', name: 'Основная колода', cards: [] }];
             try {
-                const stored = await localforage.getItem('folders');
+                const stored = await withStorageTimeout(localforage.getItem('folders'), 'колоды');
                 if (stored && Array.isArray(stored) && stored.length > 0) {
                     folders = stored;
+                    // Чистим мусор СРАЗУ, до любого обращения к полям колод.
+                    // Иначе одна пустая запись в списке роняет ближайшую же
+                    // строку, перехват ошибки объявляет данные непрочитанными —
+                    // и целая база уходит в отказ из-за одного битого элемента.
+                    sanitizeDataStructure();
+                    if (folders.length === 0) {
+                        folders = emptyStarter();
+                        dataLoadFailed = true; // от данных не осталось ничего живого
+                    }
                     lastKnownCardCount = countAllCards(folders);
                 } else {
                     // КРИТИЧНО: раньше здесь безусловно писалась пустая колода
@@ -748,7 +865,7 @@
                     // есть, трогать их нельзя ни в коем случае.
                     let keyExists = false;
                     try {
-                        const keys = await localforage.keys();
+                        const keys = await withStorageTimeout(localforage.keys(), 'список ключей');
                         keyExists = Array.isArray(keys) && keys.includes('folders');
                     } catch (keysError) {
                         console.warn('Не удалось перечислить ключи хранилища:', keysError);
@@ -831,6 +948,67 @@
             if (changed) saveData();
         }
 
+        // ==================== НАПОМИНАНИЕ О РЕЗЕРВНОЙ КОПИИ ====================
+        // Внутренние снимки (см. ниже) спасают от сбоя приложения, но НЕ спасают,
+        // если браузер вычистит хранилище целиком или удалят иконку с экрана:
+        // снимки лежат там же, где и данные. Единственная настоящая страховка —
+        // файл, вынесенный наружу, поэтому о нём и напоминаем.
+        const BACKUP_REMINDER_DAYS = 14;
+        let lastExportTs = null;
+
+        async function loadExportInfo() {
+            try {
+                const stored = await withStorageTimeout(localforage.getItem('lastExportTs'), 'дата копии');
+                lastExportTs = typeof stored === 'number' ? stored : null;
+            } catch (e) {
+                console.warn('Не удалось прочитать дату последнего экспорта:', e);
+            }
+        }
+
+        async function markExportDone() {
+            lastExportTs = Date.now();
+            try {
+                await localforage.setItem('lastExportTs', lastExportTs);
+            } catch (e) {
+                console.warn('Не удалось запомнить дату экспорта:', e);
+            }
+        }
+
+        function daysSinceExport() {
+            if (!lastExportTs) return null;
+            return Math.floor((Date.now() - lastExportTs) / 86400000);
+        }
+
+        async function maybeRemindAboutBackup() {
+            const cardCount = countAllCards(folders);
+            if (cardCount === 0) return;              // беречь нечего
+            const days = daysSinceExport();
+            if (days !== null && days < BACKUP_REMINDER_DAYS) return;
+
+            // Не спрашиваем повторно в тот же день, если пользователь отложил.
+            try {
+                const snoozed = await withStorageTimeout(localforage.getItem('backupReminderSnoozedOn'), 'отложенное напоминание');
+                if (snoozed === localDateKey(getEffectiveDate())) return;
+            } catch (e) { /* не критично */ }
+
+            const text = days === null
+                ? `У вас ${cardCount} карточек, и резервная копия ещё ни разу не сохранялась.`
+                : `Прошло ${days} дн. с последней резервной копии. Сейчас у вас ${cardCount} карточек.`;
+
+            const ok = await showConfirmModal(
+                'Сохраните резервную копию',
+                `${text}\n\nСохраните файл в облако — iCloud Drive, Google Диск или другое хранилище. ` +
+                'Копия внутри приложения не поможет, если данные на устройстве будут потеряны целиком.',
+                { confirmLabel: 'Сохранить', cancelLabel: 'Позже', danger: false }
+            );
+            if (ok) {
+                await exportAllData();
+            } else {
+                try { await localforage.setItem('backupReminderSnoozedOn', localDateKey(getEffectiveDate())); }
+                catch (e) { /* не критично */ }
+            }
+        }
+
         // ==================== АВТОМАТИЧЕСКИЕ РЕЗЕРВНЫЕ КОПИИ ====================
         // Хранятся ОТДЕЛЬНЫМ ключом от основных данных. Смысл в том, что любой
         // сбой основного ключа (неудачное чтение, ошибка записи, повреждение)
@@ -848,7 +1026,7 @@
 
         async function getSnapshots() {
             try {
-                const stored = await localforage.getItem(SNAPSHOT_KEY);
+                const stored = await withStorageTimeout(localforage.getItem(SNAPSHOT_KEY), 'резервные копии');
                 return Array.isArray(stored) ? stored : [];
             } catch (e) {
                 console.warn('Не удалось прочитать резервные копии:', e);
@@ -965,7 +1143,7 @@
 
         async function loadStats() {
             try {
-                const stored = await localforage.getItem('stats');
+                const stored = await withStorageTimeout(localforage.getItem('stats'), 'статистика');
                 if (stored && typeof stored === 'object') {
                     stats = {
                         studyDates: stored.studyDates || [],
@@ -988,7 +1166,7 @@
 
         async function loadLimitSettings() {
             try {
-                const stored = await localforage.getItem('limitSettings');
+                const stored = await withStorageTimeout(localforage.getItem('limitSettings'), 'настройки лимитов');
                 if (stored && typeof stored === 'object') {
                     dailyLimitEnabled = !!stored.dailyLimitEnabled;
                     dailyLimitCount = parseInt(stored.dailyLimitCount) || 20;
@@ -1002,14 +1180,14 @@
             } catch (e) {
                 console.warn('Ошибка загрузки настроек лимита из localForage', e);
             }
-            const legacyEnabled = localStorage.getItem('dailyLimitEnabled');
+            const legacyEnabled = safeLocalStorage.get('dailyLimitEnabled');
             if (legacyEnabled !== null) {
                 dailyLimitEnabled = legacyEnabled === 'true';
-                const savedCount = localStorage.getItem('dailyLimitCount');
+                const savedCount = safeLocalStorage.get('dailyLimitCount');
                 if (savedCount) dailyLimitCount = parseInt(savedCount) || 20;
                 await saveLimitSettings();
-                localStorage.removeItem('dailyLimitEnabled');
-                localStorage.removeItem('dailyLimitCount');
+                safeLocalStorage.remove('dailyLimitEnabled');
+                safeLocalStorage.remove('dailyLimitCount');
             }
         }
 
@@ -2106,7 +2284,7 @@
         // ==================== ТЕМА ====================
         function setTheme(mode) {
             const html = document.documentElement;
-            localStorage.setItem('themeMode', mode);
+            safeLocalStorage.set('themeMode', mode);
             document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
             let isDark;
             if (mode === 'light') {
@@ -2127,11 +2305,11 @@
         }
 
         function initTheme() {
-            const saved = localStorage.getItem('themeMode') || 'auto';
+            const saved = safeLocalStorage.get('themeMode') || 'auto';
             setTheme(saved);
             const media = window.matchMedia('(prefers-color-scheme: dark)');
             media.addEventListener('change', () => {
-                if (localStorage.getItem('themeMode') === 'auto') {
+                if (safeLocalStorage.get('themeMode') === 'auto') {
                     setTheme('auto');
                 }
             });
@@ -2147,8 +2325,10 @@
                     // Приводим к строке: карточка без слова или перевода (из
                     // битого бэкапа) иначе роняла поиск целиком — он просто
                     // переставал что-либо находить, без видимой причины.
-                    const eng = (card.english || '').toLowerCase();
-                    const rus = (card.russian || '').toLowerCase();
+                    // String(): поле карточки может оказаться числом или
+                    // объектом (битый файл) — раньше это роняло поиск целиком.
+                    const eng = String(card.english || '').toLowerCase();
+                    const rus = String(card.russian || '').toLowerCase();
                     if (eng.includes(q) || rus.includes(q)) {
                         results.push({ ...card, folderName: folder.name, folderId: folder.id });
                     }
@@ -2183,7 +2363,7 @@
                     </div>
                     <div class="mb-3">
                         <div class="relative">
-                            <input type="text" id="search-input" placeholder="Поиск по всем колодам..." class="w-full px-4 py-3 pl-10 rounded-2xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 text-base touch-target" value="${escapeHtml(initialQuery)}">
+                            <input type="text" id="search-input" aria-label="Поиск по всем колодам" placeholder="Поиск по всем колодам..." class="w-full px-4 py-3 pl-10 rounded-2xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 text-base touch-target" value="${escapeHtml(initialQuery)}">
                             <i class="fa-solid fa-search absolute left-3 top-3.5 text-slate-400"></i>
                         </div>
                     </div>
@@ -3645,15 +3825,15 @@
         }
 
         function findDuplicates(newCards, existingCards) {
-            const existingSet = new Set(
-                existingCards.map(c => 
-                    `${(c.english || '').toLowerCase().trim()}|${(c.russian || '').toLowerCase().trim()}`
-                )
-            );
+            // String(): в базе может лежать карточка, где на месте слова число
+            // или объект (битый файл) — иначе импорт нового файла падал бы
+            // целиком при сверке с такой карточкой.
+            const keyOf = (c) => `${String((c && c.english) || '').toLowerCase().trim()}|${String((c && c.russian) || '').toLowerCase().trim()}`;
+            const existingSet = new Set(existingCards.map(keyOf));
             const duplicates = [];
             const unique = [];
             for (const card of newCards) {
-                const key = `${(card.english || '').toLowerCase().trim()}|${(card.russian || '').toLowerCase().trim()}`;
+                const key = keyOf(card);
                 if (existingSet.has(key)) {
                     duplicates.push(card);
                 } else {
@@ -3740,7 +3920,7 @@
 
         async function loadTtsVoicePrefs() {
             try {
-                const stored = await localforage.getItem('ttsVoicePrefs');
+                const stored = await withStorageTimeout(localforage.getItem('ttsVoicePrefs'), 'выбор голоса');
                 if (stored && typeof stored === 'object') {
                     manualVoiceEnName = stored.en || null;
                     manualVoiceRuName = stored.ru || null;
@@ -3820,6 +4000,27 @@
             showFoldersView();
         }
 
+        // Принудительное обновление приложения. Данные при этом НЕ ЗАТРАГИВАЮТСЯ
+        // вообще: код и сохранённые слова живут раздельно, обновление кода не
+        // может стереть колоды. Сначала скачиваем свежую страницу минуя кеш
+        // (это заодно обновляет и сам кеш), потом перезагружаемся.
+        async function forceUpdateApp() {
+            const ok = await showConfirmModal(
+                'Обновить приложение',
+                'Приложение перезагрузится и подтянет свежую версию с сервера.\n\n' +
+                'Ваши слова и прогресс при этом не пострадают — они хранятся отдельно от кода.',
+                { confirmLabel: 'Обновить', danger: false }
+            );
+            if (!ok) return;
+            try {
+                await fetch(location.href, { cache: 'reload' });
+            } catch (e) {
+                // Нет сети — перезагрузимся на том, что есть; хуже не станет.
+                console.warn('Не удалось скачать свежую версию:', e);
+            }
+            location.reload();
+        }
+
         function showImportHelpModal() {
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100]';
@@ -3868,7 +4069,14 @@ Back: Красивый</pre>
             if (folders.length === 0) return await showAlertModal('Нет данных', 'Нет данных для экспорта');
 
             const exportFolders = JSON.parse(JSON.stringify(folders)); // копия — не трогаем живые данные
-            const cache = await MediaStore.init() ? await caches.open(MediaStore.cacheName) : null;
+            // Отказ хранилища картинок не должен срывать выгрузку: слова важнее
+            // фотографий, а выгрузка нужнее всего именно когда что-то неисправно.
+            let cache = null;
+            try {
+                cache = await MediaStore.init() ? await caches.open(MediaStore.cacheName) : null;
+            } catch (e) {
+                console.warn('Хранилище картинок недоступно, выгружаем без фотографий:', e);
+            }
 
             for (const folder of exportFolders) {
                 for (const card of folder.cards) {
@@ -3909,6 +4117,7 @@ Back: Красивый</pre>
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 try {
                     await navigator.share({ files: [file], title: fileName });
+                    await markExportDone();
                     return;
                 } catch (error) {
                     if (error.name === 'AbortError') return; // пользователь сам отменил — не ошибка
@@ -3922,6 +4131,7 @@ Back: Красивый</pre>
             a.href = URL.createObjectURL(file);
             a.download = fileName;
             a.click();
+            await markExportDone();
             await showAlertModal('Экспорт готов', `Файл «${fileName}» сохранён в папку загрузок браузера (обычно «Загрузки» / Downloads).`);
         }
 
@@ -4021,12 +4231,12 @@ Back: Красивый</pre>
                     <div class="panel">
                         <div class="font-semibold text-base mb-3">Лимит новых слов</div>
                         <label class="flex items-center gap-3 cursor-pointer mb-2">
-                            <input type="checkbox" id="limit-toggle" ${dailyLimitEnabled ? 'checked' : ''} onchange="toggleLimit(this.checked)" class="w-5 h-5 accent-teal-600">
+                            <input type="checkbox" id="limit-toggle" aria-label="Ограничивать число новых слов в день" ${dailyLimitEnabled ? 'checked' : ''} onchange="toggleLimit(this.checked)" class="w-5 h-5 accent-teal-600">
                             <span class="text-sm">Ограничивать новые слова в день</span>
                         </label>
                         <div id="limit-count-wrapper" class="${dailyLimitEnabled ? '' : 'hidden'} mt-2">
                             <label class="text-sm">Максимум новых слов в день:</label>
-                            <input type="number" id="limit-count" value="${dailyLimitCount}" min="1" max="999" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" onchange="updateLimitCount(this.value)">
+                            <input type="number" id="limit-count" aria-label="Максимум новых слов в день" value="${dailyLimitCount}" min="1" max="999" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" onchange="updateLimitCount(this.value)">
                         </div>
                         <div class="text-xs text-slate-400 dark:text-slate-500 mt-2">
                             Ограничивает только новые слова. Карточки на повторение сюда не входят — для них есть отдельный лимит ниже.
@@ -4035,14 +4245,14 @@ Back: Красивый</pre>
                     <div class="panel">
                         <div class="font-semibold text-base mb-3">Лимит повторений в день</div>
                         <label class="text-sm block mb-1">Режим:</label>
-                        <select id="second-limit-mode-select" onchange="updateSecondLimitMode(this.value)" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target mb-2">
+                        <select id="second-limit-mode-select" aria-label="Режим лимита повторений" onchange="updateSecondLimitMode(this.value)" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target mb-2">
                             <option value="off" ${secondLimitMode === 'off' ? 'selected' : ''}>Выключено</option>
                             <option value="reviews_only" ${secondLimitMode === 'reviews_only' ? 'selected' : ''}>Только повторения (без новых)</option>
                             <option value="total" ${secondLimitMode === 'total' ? 'selected' : ''}>Общее число карточек (включая новые)</option>
                         </select>
                         <div id="review-limit-count-wrapper" class="${secondLimitMode === 'off' ? 'hidden' : ''} mt-2">
                             <label class="text-sm">Максимум карточек в день:</label>
-                            <input type="number" id="review-limit-count" value="${dailyReviewLimitCount}" min="1" max="9999" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" onchange="updateReviewLimitCount(this.value)">
+                            <input type="number" id="review-limit-count" aria-label="Максимум карточек в день" value="${dailyReviewLimitCount}" min="1" max="9999" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target" onchange="updateReviewLimitCount(this.value)">
                         </div>
                         <div class="text-xs text-slate-400 dark:text-slate-500 mt-2">
                             «Только повторения» скрывает новые слова, но показывает всё, что вы уже проходили — и карточки на шагах обучения, и полноценные повторения. «Общее число» — жёсткий потолок вообще на всё, включая новые слова.
@@ -4051,14 +4261,14 @@ Back: Красивый</pre>
                     <div class="panel">
                         <div class="font-semibold text-base mb-3">Порядок изучения</div>
                         <label class="flex items-center gap-3 cursor-pointer">
-                            <input type="checkbox" id="shuffle-toggle" ${shuffleEnabled ? 'checked' : ''} onchange="toggleShuffle(this.checked)" class="w-5 h-5 accent-teal-600">
+                            <input type="checkbox" id="shuffle-toggle" aria-label="Перемешивать карточки" ${shuffleEnabled ? 'checked' : ''} onchange="toggleShuffle(this.checked)" class="w-5 h-5 accent-teal-600">
                             <span class="text-sm">Перемешивать карточки</span>
                         </label>
                         <div class="text-xs text-slate-400 dark:text-slate-500 mt-2 mb-3">
                             Просроченные повторения всё равно показываются раньше остальных — перемешивается только порядок внутри одного дня.
                         </div>
                         <label class="text-sm block mb-1">Что показывать сначала:</label>
-                        <select id="card-order-select" onchange="updateCardOrderMode(this.value)" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
+                        <select id="card-order-select" aria-label="Что показывать сначала" onchange="updateCardOrderMode(this.value)" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
                             <option value="mixed" ${cardOrderMode === 'mixed' ? 'selected' : ''}>Вперемешку</option>
                             <option value="reviews_first" ${cardOrderMode === 'reviews_first' ? 'selected' : ''}>Сначала повторения, потом новые</option>
                             <option value="new_first" ${cardOrderMode === 'new_first' ? 'selected' : ''}>Сначала новые, потом повторения</option>
@@ -4070,7 +4280,7 @@ Back: Красивый</pre>
                     <div class="panel">
                         <div class="font-semibold text-base mb-3">Порог предложения архивации</div>
                         <label class="text-sm">Предлагать слово в архив, когда интервал повторения достигнет:</label>
-                        <select id="archive-threshold-select" onchange="updateArchiveThreshold(this.value)" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
+                        <select id="archive-threshold-select" aria-label="Порог предложения архивации" onchange="updateArchiveThreshold(this.value)" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
                             <option value="30" ${archiveThresholdDays === 30 ? 'selected' : ''}>Раньше — 30 дней</option>
                             <option value="60" ${archiveThresholdDays === 60 ? 'selected' : ''}>Сбалансированно — 60 дней</option>
                             <option value="90" ${archiveThresholdDays === 90 ? 'selected' : ''}>Позже — 90 дней</option>
@@ -4087,18 +4297,38 @@ Back: Красивый</pre>
                             Автоподбор не всегда угадывает самый качественный голос — можно выбрать вручную из голосов, установленных на устройстве.
                         </div>
                         <label class="block text-sm mb-1">Английский</label>
-                        <select id="voice-select-en" onchange="updateManualVoice('en', this.value)" class="w-full mb-3 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
+                        <select id="voice-select-en" aria-label="Голос для английского" onchange="updateManualVoice('en', this.value)" class="w-full mb-3 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
                             <option value="">Авто (подбирается автоматически)</option>
                             ${voicesList.filter(v => v.lang && v.lang.toLowerCase().startsWith('en')).map(v => `<option value="${escapeHtml(v.name)}" ${manualVoiceEnName === v.name ? 'selected' : ''}>${escapeHtml(v.name)} (${v.lang})</option>`).join('')}
                         </select>
                         <label class="block text-sm mb-1">Русский</label>
-                        <select id="voice-select-ru" onchange="updateManualVoice('ru', this.value)" class="w-full mb-3 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
+                        <select id="voice-select-ru" aria-label="Голос для русского" onchange="updateManualVoice('ru', this.value)" class="w-full mb-3 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
                             <option value="">Авто (подбирается автоматически)</option>
                             ${voicesList.filter(v => v.lang && v.lang.toLowerCase().startsWith('ru')).map(v => `<option value="${escapeHtml(v.name)}" ${manualVoiceRuName === v.name ? 'selected' : ''}>${escapeHtml(v.name)} (${v.lang})</option>`).join('')}
                         </select>
                         ${voicesList.length === 0 ? '<div class="text-xs text-amber-500 mb-2">Список голосов ещё не загрузился — закройте и снова откройте Настройки.</div>' : ''}
                         <button onclick="speakWord('Hello, this is a test of the selected voice')" class="w-full py-2.5 rounded-xl border border-teal-600 text-teal-600 dark:text-teal-400 dark:border-teal-400 font-medium text-sm touch-target mb-2">🔊 Прослушать английский</button>
                         <button onclick="speakWord('Привет, это проверка выбранного голоса')" class="w-full py-2.5 rounded-xl border border-teal-600 text-teal-600 dark:text-teal-400 dark:border-teal-400 font-medium text-sm touch-target">🔊 Прослушать русский</button>
+                    </div>
+                    <div class="panel">
+                        <div class="font-semibold text-base mb-3">Версия и обновление</div>
+                        <div class="text-sm mb-1">Версия <b>${APP_VERSION}</b></div>
+                        <div class="text-xs text-slate-400 dark:text-slate-500 mb-3">Сборка от ${APP_BUILD_LABEL}</div>
+                        <button onclick="forceUpdateApp()" class="w-full py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target mb-3">Проверить обновление</button>
+                        <div class="text-xs text-slate-500 dark:text-slate-400 leading-snug">
+                            Обновление кода <b>никогда не удаляет ваши слова</b> — они хранятся отдельно.<br>
+                            А вот <b>удаление приложения с экрана «Домой» стирает их безвозвратно</b>. Если что-то работает не так, сначала закройте приложение полностью и откройте заново, а не удаляйте.
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="font-semibold text-base mb-3">Сохранность данных</div>
+                        <div id="data-safety-info" class="text-sm space-y-1 mb-3">
+                            <div class="text-slate-400 dark:text-slate-500">Проверяю состояние…</div>
+                        </div>
+                        <button onclick="exportAllData()" class="w-full py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target mb-2">Сохранить резервную копию</button>
+                        <div class="text-xs text-slate-400 dark:text-slate-500">
+                            Сохраняйте файл в облако (iCloud Drive, Google Диск). Копии внутри приложения не помогут, если данные на устройстве пропадут целиком.
+                        </div>
                     </div>
                     <div class="panel">
                         <div class="font-semibold text-base mb-3">Резервные копии</div>
@@ -4113,11 +4343,11 @@ Back: Красивый</pre>
                             <button onclick="showImportHelpModal()" class="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-x-1 touch-target"><i class="fa-solid fa-info-circle"></i> <span>Как импортировать</span></button>
                         </div>
                         <div class="mb-3"><label class="block text-sm mb-1">Колода</label>
-                            <select id="import-folder-select" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 touch-target">
+                            <select id="import-folder-select" aria-label="Колода для импорта" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 touch-target">
                                 ${folders.map(f => `<option value="${f.id}" ${f.id === currentFolderId ? 'selected' : ''}>${escapeHtml(f.name)}</option>`).join('')}
                             </select>
                         </div>
-                        <textarea id="import-text" placeholder="Вставьте слова или предложения в любом поддерживаемом формате" class="w-full h-28 p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 font-mono text-sm"></textarea>
+                        <textarea id="import-text" aria-label="Текст для импорта слов" placeholder="Вставьте слова или предложения в любом поддерживаемом формате" class="w-full h-28 p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 font-mono text-base"></textarea>
                         <button onclick="importWords()" class="w-full mt-3 py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target">Импортировать</button>
                     </div>
                     <div class="panel">
@@ -4126,7 +4356,7 @@ Back: Красивый</pre>
                             <i class="fa-solid fa-file-export w-5 text-teal-600"></i> <span>Экспорт всех данных</span>
                         </button>
                         <div class="text-sm mb-1 px-1">Импорт из файла (.json)</div>
-                        <input type="file" id="import-file-input" accept=".json" class="w-full text-sm touch-target px-1">
+                        <input type="file" id="import-file-input" aria-label="Файл резервной копии для импорта" accept=".json" class="w-full text-base touch-target px-1">
                         <button onclick="importFromFile()" class="w-full mt-2 py-3 rounded-xl bg-indigo-600 text-white font-medium text-base touch-target">Загрузить</button>
                     </div>
                     <div class="panel">
@@ -4141,6 +4371,37 @@ Back: Красивый</pre>
                     </div>
                 </div>
             `;
+            renderDataSafetyInfo(); // наполняем блок сохранности асинхронно, не задерживая экран
+        }
+
+        // Показывает реальное положение дел с данными: сколько карточек, когда
+        // последняя копия, защищено ли хранилище от вычистки, сколько места.
+        async function renderDataSafetyInfo() {
+            const el = document.getElementById('data-safety-info');
+            if (!el) return;
+            const lines = [];
+            const cards = countAllCards(folders);
+            lines.push(`<div>Карточек: <b>${cards}</b> в ${folders.length} колодах</div>`);
+
+            const days = daysSinceExport();
+            if (days === null) {
+                lines.push('<div class="text-amber-600 dark:text-amber-400">Резервная копия ещё не сохранялась</div>');
+            } else if (days >= BACKUP_REMINDER_DAYS) {
+                lines.push(`<div class="text-amber-600 dark:text-amber-400">Последняя копия: ${days} дн. назад — пора обновить</div>`);
+            } else {
+                lines.push(`<div class="text-slate-500 dark:text-slate-400">Последняя копия: ${days === 0 ? 'сегодня' : days + ' дн. назад'}</div>`);
+            }
+
+            const info = await StorageGuard.measure();
+            if (info) {
+                lines.push(`<div class="text-slate-500 dark:text-slate-400">Занято: ${StorageGuard.formatBytes(info.usage)} из ${StorageGuard.formatBytes(info.quota)}</div>`);
+            }
+            if (StorageGuard.persisted === true) {
+                lines.push('<div class="text-slate-500 dark:text-slate-400">Хранилище защищено от автоочистки</div>');
+            } else if (StorageGuard.persisted === false) {
+                lines.push('<div class="text-amber-600 dark:text-amber-400">Система может очистить данные при нехватке места — держите копию в облаке</div>');
+            }
+            el.innerHTML = lines.join('');
         }
 
         async function toggleShuffle(enabled) {
@@ -4285,8 +4546,9 @@ Back: Красивый</pre>
 
         // ==================== TTS (ОЗВУЧКА) ====================
         function detectLanguage(text) {
-            const cyrillicCount = (text.match(/[а-яё]/gi) || []).length;
-            const latinCount = (text.match(/[a-z]/gi) || []).length;
+            const str = String(text == null ? '' : text);
+            const cyrillicCount = (str.match(/[а-яё]/gi) || []).length;
+            const latinCount = (str.match(/[a-z]/gi) || []).length;
             if (cyrillicCount === 0) return 'en';
             if (latinCount === 0) return 'ru';
             // Текст смешанный (например, английское слово + русская пометка в
@@ -4550,6 +4812,12 @@ Back: Красивый</pre>
 
         // ==================== ИНИЦИАЛИЗАЦИЯ ====================
         async function init() {
+            // Просим постоянное хранилище КАК МОЖНО РАНЬШЕ и при каждом запуске:
+            // без него браузер вправе вычистить все данные приложения, когда на
+            // устройстве кончается место. Разрешение не сохраняется между
+            // запусками, поэтому запрашиваем каждый раз, не дожидаясь ответа.
+            StorageGuard.requestPersistence();
+
             // Прогреваем голоса TTS максимально рано и без ожидания — на iOS
             // Safari список голосов иногда приходит не мгновенно, а speak()
             // обязан вызываться синхронно с тапом пользователя. Прогрев здесь
@@ -4564,6 +4832,7 @@ Back: Красивый</pre>
             await loadStats();
             await loadLimitSettings();
             await loadTtsVoicePrefs();
+            await loadExportInfo();
             initTheme();
 
             const mediaAvailable = await MediaStore.init();
@@ -4588,6 +4857,12 @@ Back: Красивый</pre>
                     'Закройте приложение полностью и откройте заново. Если колоды не вернутся — ' +
                     'восстановите их из файла резервной копии через импорт.'
                 );
+            } else {
+                // Порядок важен: сначала место (без него не сохранится и сама
+                // копия), потом напоминание о копии. При сбое загрузки не
+                // показываем ни то, ни другое — там своё, более важное сообщение.
+                await StorageGuard.checkSpaceAndWarn();
+                await maybeRemindAboutBackup();
             }
 
             // Устанавливаем обработчик Escape (без дублирования)
@@ -4629,7 +4904,48 @@ Back: Красивый</pre>
             lastTouchEnd = now;
         }, { passive: false });
 
-        window.onload = init;
+        // Запуск с перехватом сбоя. Раньше любая ошибка внутри init() означала
+        // белый экран без единого слова — а человек в такой ситуации решает,
+        // что приложение сломалось, и удаляет его с экрана. Именно удаление
+        // уничтожает данные окончательно. Поэтому здесь мы обязаны показать
+        // сообщение прямо в разметке (модалки может не быть — она часть того же
+        // приложения, которое не запустилось) и прямо запретить удаление.
+        window.onload = function () {
+            try {
+                const result = init();
+                if (result && typeof result.catch === 'function') {
+                    result.catch(showStartupFailure);
+                }
+            } catch (e) {
+                showStartupFailure(e);
+            }
+        };
+
+        function showStartupFailure(error) {
+            console.error('Сбой при запуске приложения:', error);
+            try {
+                const box = document.createElement('div');
+                box.id = 'startup-failure';
+                box.setAttribute('style',
+                    'position:fixed;inset:0;z-index:9999;background:#0f172a;color:#f1f5f9;' +
+                    'padding:24px;font-family:system-ui,sans-serif;overflow:auto;line-height:1.5');
+                const message = (error && error.message) ? String(error.message) : 'неизвестная ошибка';
+                box.innerHTML =
+                    '<h2 style="font-size:20px;margin:0 0 12px">Приложение не смогло запуститься</h2>' +
+                    '<p style="margin:0 0 12px"><b>Ваши слова при этом никуда не делись</b> — они хранятся отдельно ' +
+                    'и не пострадали от этой ошибки.</p>' +
+                    '<p style="margin:0 0 12px"><b>Не удаляйте приложение с экрана «Домой».</b> ' +
+                    'Именно удаление стирает сохранённые слова — а сейчас они целы.</p>' +
+                    '<p style="margin:0 0 12px">Закройте приложение полностью (смахните из переключателя задач) ' +
+                    'и откройте заново. Если не поможет — откройте тот же адрес обычной вкладкой в браузере.</p>' +
+                    '<p style="margin:16px 0 0;font-size:12px;opacity:.6">Техническая причина: ' +
+                    message.replace(/</g, '&lt;') + '</p>';
+                document.body.appendChild(box);
+            } catch (e) {
+                // Даже разметка недоступна — последнее, что можно сделать.
+                console.error('Не удалось показать сообщение о сбое:', e);
+            }
+        }
     </script>
 </body>
 </html>
