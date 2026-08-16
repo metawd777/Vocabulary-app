@@ -2339,6 +2339,10 @@
                 return;
             }
             const oldImageId = card.imageId;
+            // Прежняя ссылка на картинку в памяти после замены недействительна:
+            // не освободить её — утечка, оставить в карточке — риск показать
+            // старое фото там, где ссылку переиспользуют.
+            if (card._imageObjectUrl) { URL.revokeObjectURL(card._imageObjectUrl); card._imageObjectUrl = null; }
             card.image = null;
             card.imageId = imageId;
             if (oldImageId && oldImageId !== imageId) {
@@ -3322,13 +3326,15 @@
             input.accept = 'image/*';
             input.onchange = async () => {
                 if (!input.files[0]) return;
-                const folder = getCurrentFolder();
-                const card = folder.cards.find(c => c.id === cardId);
+                // Ищем по всем колодам, а не в текущей: при обучении по всем
+                // колодам сразу карточка лежит не в той, что открыта, поиск
+                // возвращал пустоту, и замена молча не происходила.
+                const { card, folder } = findCardAndFolderById(cardId);
                 if (!card) return;
                 await compressAndSetImage(card, input.files[0]);
                 await debouncedSaveData();
                 if (dueCards.some(c => c.id === cardId)) showCurrentCard();
-                else showFolderCards(currentFolderId);
+                else showFolderCards(folder ? folder.id : currentFolderId);
             };
             input.click();
         }
@@ -3336,8 +3342,9 @@
         async function removeCardImage(cardId) {
             const ok = await showConfirmModal('Удалить фото', 'Удалить фото у этой карточки?', { confirmLabel: 'Удалить' });
             if (!ok) return;
-            const folder = getCurrentFolder();
-            const card = folder.cards.find(c => c.id === cardId);
+            // Та же беда, что и при замене: в текущей колоде карточки может не
+            // быть, и удаление молча не срабатывало.
+            const { card, folder } = findCardAndFolderById(cardId);
             if (!card) return;
             if (card.imageId) await MediaStore.deleteImage(card.imageId);
             if (card._imageObjectUrl) { URL.revokeObjectURL(card._imageObjectUrl); card._imageObjectUrl = null; }
@@ -3345,7 +3352,7 @@
             card.imageId = null;
             await debouncedSaveData();
             if (dueCards.some(c => c.id === cardId)) showCurrentCard();
-            else showFolderCards(currentFolderId);
+            else showFolderCards(folder ? folder.id : currentFolderId);
         }
 
         function speakCurrentWord() {
@@ -3761,11 +3768,10 @@
             input.onchange = async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-                const folder = getCurrentFolder();
-                const card = folder.cards.find(c => c.id === cardId);
+                const { card, folder } = findCardAndFolderById(cardId);
                 if (card) {
                     await compressAndSetImage(card, file);
-                    showFolderCards(currentFolderId);
+                    showFolderCards(folder ? folder.id : currentFolderId);
                 }
             };
             input.click();
