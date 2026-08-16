@@ -1937,10 +1937,12 @@
             { id: 'streak_100', icon: '🔥', title: 'Сотня', desc: 'Заниматься 100 дней подряд', category: 'Серия дней', check: (g, streak) => streak >= 100 },
 
             // ---- Объём выученного ----
-            { id: 'learned_10', icon: '📚', title: 'Первые десять', desc: 'Выучить 10 слов', category: 'Объём', check: (g) => g.learnedCount >= 10 },
-            { id: 'learned_50', icon: '📚', title: 'Полсотни', desc: 'Выучить 50 слов', category: 'Объём', check: (g) => g.learnedCount >= 50 },
-            { id: 'learned_200', icon: '📚', title: 'Двести', desc: 'Выучить 200 слов', category: 'Объём', check: (g) => g.learnedCount >= 200 },
-            { id: 'learned_500', icon: '📚', title: 'Пятьсот', desc: 'Выучить 500 слов', category: 'Объём', check: (g) => g.learnedCount >= 500 },
+            // Считается по архиву: выученным словом владелец считает то, которое
+            // отправлено в «Изученные слова», а не то, что дошло до повторений.
+            { id: 'learned_10', icon: '📚', title: 'Первые десять', desc: 'Отправить в архив 10 слов', category: 'Объём', check: (g) => g.masteredCount >= 10 },
+            { id: 'learned_50', icon: '📚', title: 'Полсотни', desc: 'Отправить в архив 50 слов', category: 'Объём', check: (g) => g.masteredCount >= 50 },
+            { id: 'learned_200', icon: '📚', title: 'Двести', desc: 'Отправить в архив 200 слов', category: 'Объём', check: (g) => g.masteredCount >= 200 },
+            { id: 'learned_500', icon: '📚', title: 'Пятьсот', desc: 'Отправить в архив 500 слов', category: 'Объём', check: (g) => g.masteredCount >= 500 },
 
             // ---- Качество FSRS ----
             { id: 'long_memory_90', icon: '🧠', title: 'Долгая память', desc: 'Довести интервал повторения слова до 90 дней', category: 'Интенсивность', check: (g) => g.maxInterval >= 90 },
@@ -1955,9 +1957,8 @@
 
             // ---- Престижные (дальний горизонт, месяцы регулярной практики) ----
             { id: 'anniversary', icon: '🎂', title: 'Годовщина', desc: 'Заниматься 365 дней подряд', category: 'Особые', check: (g, streak) => streak >= 365 },
-            { id: 'thousand', icon: '🏅', title: 'Тысяча', desc: 'Выучить 1000 слов, занимаясь минимум 90 разных дней', category: 'Особые', check: (g) => g.learnedCount >= 1000 && (stats.studyDates?.length || 0) >= 90 },
+            { id: 'thousand', icon: '🏅', title: 'Тысяча', desc: 'Отправить в архив 1000 слов, занимаясь минимум 90 разных дней', category: 'Особые', check: (g) => g.masteredCount >= 1000 && (stats.studyDates?.length || 0) >= 90 },
             { id: 'eternity', icon: '♾️', title: 'Вечность', desc: 'Довести интервал повторения слова до 365 дней', category: 'Особые', check: (g) => g.maxInterval >= 365 },
-            { id: 'archive_master', icon: '🏛️', title: 'Архивариус-мастер', desc: '200 карточек в архиве', category: 'Особые', check: (g) => g.masteredCount >= 200 },
         ];
 
         let achievementQueue = [];
