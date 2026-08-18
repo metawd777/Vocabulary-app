@@ -154,6 +154,19 @@
         }
         .dark .study-card { background:#1e293b; border-color:#334155; }
 
+        /* Строка списка карточек. Одно слово без пробелов — немецкое сложное,
+           ссылка, химический термин — не переносится и выталкивает строку за
+           экран: на iPhone SE замерено 385 px наружу, текст обрезается. На
+           словах владельца этого не видно (все фразы с пробелами), но одного
+           такого слова хватает, чтобы сломать весь список.
+           min-width:0 обязателен: flex-элемент по умолчанию отказывается
+           сжиматься ниже ширины содержимого, и одного переноса не хватает. */
+        .card-row-text {
+            min-width: 0;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
         .study-card .word-english,
         .study-card .word-russian {
             max-width: 100%;
@@ -510,6 +523,10 @@
         let currentFolderId = 'default';
         let currentCardIndex = 0;
         let dueCards = [];
+        // Чем именно занимались: одной колодой или всеми. Нужно, чтобы в конце
+        // очереди пересобрать её тем же составом — очередь строится один раз при
+        // входе, и всё, что созрело за время занятия, иначе остаётся невидимым.
+        let currentStudyScope = null;
         let initialDueCount = 0;
         let editingCardId = null;
         let viewingCardId = null;
@@ -900,6 +917,10 @@
                 folders = emptyStarter();
                 dataLoadFailed = true;
             }
+            // Номер версии, с которым работает эта копия.
+            try { dataRevision = Number(await localforage.getItem('foldersRevision')) || 0; }
+            catch (e) { dataRevision = 0; }
+            dataLoadFinished = true;
             // Миграции меняют данные и сами вызывают сохранение — при неудачном
             // чтении запускать их нельзя.
             if (!dataLoadFailed) migrateData();
@@ -1073,10 +1094,52 @@
         // Служит опорой для проверки перед записью: массовая пропажа карточек
         // без явного удаления пользователем — почти наверняка сбой, а не намерение.
         let lastKnownCardCount = null;
+        // Пока loadData не завершилась, оба рубежа защиты не взведены:
+        // dataLoadFailed ещё false, а lastKnownCardCount ещё null. Если в это
+        // окно случится сохранение — уход в фон, закрытие вкладки, — на диск
+        // ляжет пустая стартовая заготовка поверх настоящих колод. Окно длится
+        // до STORAGE_TIMEOUT_MS = 10 с, и на медленном хранилище это достижимо.
+        // Поэтому запись запрещена, пока чтение не закончилось тем или иным исходом.
+        let dataLoadFinished = false;
         // Поднимается на время намеренных удалений (удаление колоды, карточек,
         // сброс прогресса, замена данных при импорте), чтобы проверка ниже не
         // мешала пользователю делать то, что он осознанно попросил.
         let intentionalBulkChange = false;
+
+        // Третий рубеж — от второй открытой копии приложения. Каждая копия держит
+        // в памяти ВЕСЬ список колод и пишет его целиком, поэтому записавшая
+        // последней стирает работу другой: позанимались во вкладке A, вкладка B
+        // сохранила что угодно — сессия A исчезла. Проверено, воспроизводится.
+        //
+        // Номер версии лежит рядом с колодами и растёт на единицу при каждой
+        // записи. Копия помнит номер, который прочитала при загрузке. Если на
+        // диске номер больше — писала другая копия, и класть поверх нельзя.
+        // При одной открытой копии номера совпадают всегда: увеличивает их
+        // только собственная запись, поэтому ложных срабатываний не бывает.
+        let dataRevision = 0;
+        let conflictReported = false;
+
+        // Общая для обоих путей сохранения проверка: true — писать нельзя.
+        // Намеренную замену (импорт, восстановление из копии) не трогаем:
+        // пользователь осознанно попросил заменить данные целиком.
+        async function anotherCopyWroteFirst() {
+            if (intentionalBulkChange) return false;
+            try {
+                const наДиске = Number(await localforage.getItem('foldersRevision')) || 0;
+                return наДиске > dataRevision;
+            } catch (e) {
+                // Не прочитался мелкий служебный ключ — это не повод отказывать в
+                // сохранении данных: иначе его сбой заблокировал бы всю работу.
+                console.warn('Не удалось прочитать номер версии данных:', e);
+                return false;
+            }
+        }
+
+        async function bumpRevision() {
+            dataRevision++;
+            try { await localforage.setItem('foldersRevision', dataRevision); }
+            catch (e) { console.warn('Не удалось записать номер версии данных:', e); }
+        }
 
         async function withIntentionalChange(fn) {
             intentionalBulkChange = true;
@@ -1087,6 +1150,10 @@
         async function saveData() {
             // Первый рубеж: если колоды не загрузились, в памяти лежит пустая
             // заготовка. Записать её — значит уничтожить то, что уцелело на диске.
+            if (!dataLoadFinished) {
+                console.warn('Сохранение заблокировано: чтение колод ещё не завершилось');
+                return;
+            }
             if (dataLoadFailed) {
                 console.warn('Сохранение заблокировано: колоды не были загружены корректно');
                 return;
@@ -1106,8 +1173,21 @@
                 dataLoadFailed = true; // дальнейшие записи тоже блокируем
                 return;
             }
+            if (await anotherCopyWroteFirst()) {
+                console.warn('Сохранение остановлено: данные изменены другой копией приложения');
+                if (!conflictReported) {
+                    conflictReported = true;
+                    await showAlertModal(
+                        'Данные изменены в другом окне',
+                        'Приложение открыто ещё где-то — во второй вкладке или отдельным значком, — и там данные уже изменились.\n\n' +
+                        'Чтобы не стереть ту работу, сохранение здесь остановлено. Обновите страницу: приложение перечитает свежие данные, и всё продолжит работать.'
+                    );
+                }
+                return;
+            }
             try {
                 await localforage.setItem('folders', folders);
+                await bumpRevision();
                 lastKnownCardCount = nowCount;
             } catch (e) {
                 console.error('Ошибка сохранения:', e);
@@ -1127,7 +1207,12 @@
         // повторит попытку при следующем действии, а модалка посреди чужого
         // системного диалога всё равно не поможет пользователю — только напугает.
         async function saveDataSilent() {
-            if (dataLoadFailed) return;
+            if (!dataLoadFinished || dataLoadFailed) return;
+            // Без модалки: это уход в фон, показывать окно некому и незачем.
+            if (await anotherCopyWroteFirst()) {
+                console.warn('Фоновое сохранение остановлено: данные изменены другой копией');
+                return;
+            }
             const nowCount = countAllCards(folders);
             // Тот же рубеж, что и в saveData: фоновое сохранение (уход в фон,
             // закрытие вкладки) не должно молча закрепить массовую пропажу.
@@ -1138,6 +1223,7 @@
             }
             try {
                 await localforage.setItem('folders', folders);
+                await bumpRevision();
                 lastKnownCardCount = nowCount;
             } catch (e) {
                 console.warn('Фоновое сохранение не удалось (не критично, будет повторено):', e);
@@ -1203,6 +1289,19 @@
                 ids: sessionStableCandidates.map(c => c.id)
             };
             await saveStats();
+        }
+
+        // Список кандидатов копится в течение СУТОК, и сутки кончаются не только
+        // при перезапуске. Приложение, оставленное открытым через полночь, — на
+        // телефоне это норма, вкладку никто не закрывает, — иначе наутро предложит
+        // вчерашние слова вместе с сегодняшними. При запуске список чистит
+        // restoreStableCandidates, здесь — на ходу, без перезапуска.
+        function dropStaleStableCandidates() {
+            const saved = stats.stableCandidates;
+            if (!saved || !saved.date) return;
+            if (saved.date !== localDateKey(getEffectiveDate()) && sessionStableCandidates.length > 0) {
+                sessionStableCandidates = [];
+            }
         }
 
         // Единая точка очистки: список исчезает и с экрана, и с диска.
@@ -1737,6 +1836,7 @@
             const days = Math.floor(diffMs / 86400000);
             let text = days > 0 ? `через ${days} ${days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'}` :
                        hours > 0 ? `через ${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'}` :
+                       minutes < 1 ? 'меньше чем через минуту' :
                        `через ${minutes} ${minutes === 1 ? 'минуту' : minutes < 5 ? 'минуты' : 'минут'}`;
             return { text, date: new Date(soonest.nextReviewDate) };
         }
@@ -2258,6 +2358,7 @@
 
         // ==================== ПОКАЗ СТАБИЛЬНЫХ СЛОВ ====================
         function showEndOfSessionStableReview() {
+            dropStaleStableCandidates();
             if (!sessionStableCandidates || sessionStableCandidates.length === 0) return;
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[120]';
@@ -2710,7 +2811,7 @@
 
             if (selectionMode) {
                 row.innerHTML = `
-                    <div class="flex items-center flex-1" onclick="toggleCardSelection('${card.id}')">
+                    <div class="flex items-center flex-1 card-row-text" onclick="toggleCardSelection('${card.id}')">
                         <input type="checkbox" ${isSelected ? 'checked' : ''} 
                                class="w-5 h-5 mr-3 accent-teal-600 pointer-events-none">
                         <div>
@@ -2723,7 +2824,7 @@
                 `;
             } else {
                 row.innerHTML = `
-                    <div class="flex-1 cursor-pointer" onclick="viewCard('${card.id}')">
+                    <div class="flex-1 cursor-pointer card-row-text" onclick="viewCard('${card.id}')">
                         <div class="font-medium">${escapeHtml(card.english)}${(card.lapses || 0) >= LEECH_THRESHOLD ? ' <span title="Трудное слово — часто забывается, стоит переформулировать">⚠️</span>' : ''}</div>
                         <div class="text-sm text-slate-500 dark:text-slate-400">${escapeHtml(card.russian)}</div>
                     </div>
@@ -3036,6 +3137,7 @@
             }
             resetSelectionState();
             const cards = folder.cards || [];
+            currentStudyScope = { type: 'folder', id: folderId };
             dueCards = applyDailyLimit(getDueCardsFromArray(cards));
             initialDueCount = dueCards.length;
             if (dueCards.length === 0) {
@@ -3054,6 +3156,7 @@
         // поэтому подтверждение не нужно — теряется только очередь оставшихся карточек,
         // а они всё равно останутся due и будут показаны в следующий раз.
         function exitStudySession() {
+            currentStudyScope = null;
             dueCards = [];
             currentCardIndex = 0;
             undoStack = [];
@@ -3064,15 +3167,8 @@
         async function startStudy() {
             resetSelectionState();
             document.getElementById('current-folder-name').textContent = 'Обучение';
-            const visibleFolders = folders.filter(f => !f.hidden && !f.system);
-            const allCards = [];
-            visibleFolders.forEach(folder => {
-                folder.cards.forEach(card => {
-                    card.folderId = folder.id;
-                    card.folderName = folder.name;
-                    allCards.push(card);
-                });
-            });
+            currentStudyScope = { type: 'all' };
+            const allCards = getStudyScopeCards();
             dueCards = applyDailyLimit(getDueCardsFromArray(allCards));
             initialDueCount = dueCards.length;
             if (dueCards.length === 0) {
@@ -3142,6 +3238,35 @@
             `;
         }
 
+        // Состав карточек той области, с которой начали занятие.
+        function getStudyScopeCards() {
+            if (!currentStudyScope) return [];
+            if (currentStudyScope.type === 'folder') {
+                const f = folders.find(x => x.id === currentStudyScope.id);
+                return f ? (f.cards || []) : [];
+            }
+            const all = [];
+            folders.filter(f => !f.hidden && !f.system).forEach(folder => {
+                folder.cards.forEach(card => {
+                    card.folderId = folder.id;
+                    card.folderName = folder.name;
+                    all.push(card);
+                });
+            });
+            return all;
+        }
+
+        // Продолжаем тем же составом: очередь собирается заново, поэтому в неё
+        // попадает всё, что созрело за время предыдущей части занятия.
+        function continueStudySession() {
+            dueCards = applyDailyLimit(getDueCardsFromArray(getStudyScopeCards()));
+            currentCardIndex = 0;
+            initialDueCount = dueCards.length;
+            lastReviewedCard = null;
+            undoStack = [];
+            showCurrentCard();
+        }
+
         function showCurrentCard() {
             if (currentCardIndex > 0 && dueCards[currentCardIndex - 1]?._imageObjectUrl) {
                 URL.revokeObjectURL(dueCards[currentCardIndex - 1]._imageObjectUrl);
@@ -3149,16 +3274,31 @@
             }
             if (currentCardIndex >= dueCards.length) {
                 const container = document.getElementById('main-content');
+                // Очередь была снимком на момент входа. За время занятия часть
+                // карточек успевает созреть — раньше экран всё равно писал «все
+                // карточки повторены», и они молча ждали повторного входа.
+                const ripened = applyDailyLimit(getDueCardsFromArray(getStudyScopeCards())).length;
+                const plural = ripened % 10 === 1 && ripened % 100 !== 11 ? 'слово'
+                    : [2, 3, 4].includes(ripened % 10) && ![12, 13, 14].includes(ripened % 100) ? 'слова' : 'слов';
                 container.innerHTML = `
                     <div class="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
                         <i class="fa-solid fa-check-circle text-7xl text-emerald-500 mb-6"></i>
                         <div class="text-2xl font-semibold mb-3">Отлично!</div>
                         <div class="text-slate-500 dark:text-slate-400 max-w-xs mb-8">
-                            Все карточки на сегодня повторены.
+                            ${ripened > 0
+                                ? `Очередь пройдена. Пока вы занимались, подошёл срок ещё у <b>${ripened}</b> ${plural}.`
+                                : 'Все карточки на сегодня повторены.'}
                         </div>
+                        ${ripened > 0 ? `
+                        <button onclick="continueStudySession()" class="px-8 py-3.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white rounded-2xl font-medium text-base touch-target transition mb-3">
+                            Продолжить
+                        </button>
+                        <button onclick="showFoldersView()" class="px-8 py-3.5 rounded-2xl border border-slate-300 dark:border-slate-600 font-medium text-base touch-target transition">
+                            Вернуться к колодам
+                        </button>` : `
                         <button onclick="showFoldersView()" class="px-8 py-3.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white rounded-2xl font-medium text-base touch-target transition">
                             Вернуться к колодам
-                        </button>
+                        </button>`}
                     </div>
                 `;
                 updateUndoButton();
@@ -3197,11 +3337,16 @@
             } else {
                 // Пустая рамка «Добавить фото» занимала середину карточки на
                 // КАЖДОМ слове без снимка — то есть почти всегда, — и отодвигала
-                // вниз само слово, ради которого экран существует. Вместо неё
-                // кнопка в левом верхнем углу, зеркально «⋮»: середина карточки
-                // отдана перевороту, низ граничит с кнопками оценки и промах там
-                // стоит дорого, а верхние углы свободны от обоих.
-                addPhotoHtml = `<button onclick="uploadImageForCurrentCard(event)" aria-label="Добавить фото" class="absolute top-3 left-3 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 touch-target">
+                // вниз само слово, ради которого экран существует. Поэтому она
+                // стала иконкой в верхней кромке: середина карточки отдана
+                // перевороту, низ граничит с кнопками оценки и промах там стоит
+                // дорого. Не левый угол: над ним стоят «← Назад» и текст
+                // прогресса, и камера читалась как продолжение того же столбца.
+                // Не правый: там «⋮». Остаётся центр — единственное место,
+                // свободное от всех трёх. Смещение задано инлайном, а не
+                // классом, чтобы не зависеть от того, собран ли в этой сборке
+                // Tailwind-класс -translate-x-1/2.
+                addPhotoHtml = `<button onclick="uploadImageForCurrentCard(event)" aria-label="Добавить фото" style="left:50%; transform:translateX(-50%);" class="absolute top-3 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 touch-target">
                      <i class="fa-solid fa-camera text-lg"></i>
                    </button>`;
             }
@@ -3320,6 +3465,28 @@
             document.body.appendChild(overlay);
         }
 
+        // Меню фото из модалки просмотра. Карточку ищем по всем колодам, а не в
+        // текущей: та же ошибка уже была в changeCardImage и removeCardImage —
+        // при обучении по всем колодам карточка лежит не в открытой колоде.
+        function openImageMenuForViewedCard() {
+            if (!viewingCardId) return;
+            const { card } = findCardAndFolderById(viewingCardId);
+            if (card) showImageActionMenu(card);
+        }
+
+        // Перерисовываем именно тот экран, который открыт. Раньше всегда
+        // перерисовывался список колоды — и открытая поверх него модалка
+        // просмотра продолжала показывать старое фото.
+        function refreshAfterImageChange(cardId, folder) {
+            const viewModal = document.getElementById('cardViewModal');
+            if (viewingCardId === cardId && viewModal && !viewModal.classList.contains('hidden')) {
+                viewCard(cardId);
+                return;
+            }
+            if (dueCards.some(c => c.id === cardId)) showCurrentCard();
+            else showFolderCards(folder ? folder.id : currentFolderId);
+        }
+
         async function changeCardImage(cardId) {
             const input = document.createElement('input');
             input.type = 'file';
@@ -3333,8 +3500,7 @@
                 if (!card) return;
                 await compressAndSetImage(card, input.files[0]);
                 await debouncedSaveData();
-                if (dueCards.some(c => c.id === cardId)) showCurrentCard();
-                else showFolderCards(folder ? folder.id : currentFolderId);
+                refreshAfterImageChange(cardId, folder);
             };
             input.click();
         }
@@ -3351,8 +3517,7 @@
             card.image = null;
             card.imageId = null;
             await debouncedSaveData();
-            if (dueCards.some(c => c.id === cardId)) showCurrentCard();
-            else showFolderCards(folder ? folder.id : currentFolderId);
+            refreshAfterImageChange(cardId, folder);
         }
 
         function speakCurrentWord() {
@@ -3388,9 +3553,9 @@
                             <i class="fa-solid fa-volume-up"></i>
                         </button>
                     </div>
-                    ${card.imageId || (card.image && card.image.startsWith('data:image')) 
-                        ? `<img id="view-card-image" class="max-h-48 mx-auto rounded-2xl mt-4">` 
-                        : ''}
+                    ${card.imageId || (card.image && card.image.startsWith('data:image'))
+                        ? `<img id="view-card-image" onclick="event.stopImmediatePropagation(); openImageMenuForViewedCard()" class="max-h-48 mx-auto rounded-2xl mt-4 cursor-pointer" alt="Фото карточки">`
+                        : `<button onclick="event.stopImmediatePropagation(); openImageMenuForViewedCard()" style="border-style:dashed;" class="mt-4 mx-auto flex items-center gap-x-2 px-4 py-2.5 rounded-2xl border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 text-sm touch-target"><i class="fa-solid fa-camera"></i> <span>Добавить фото</span></button>`}
                 </div>
             `;
             document.getElementById('cardViewModal').classList.remove('hidden');
@@ -3517,6 +3682,7 @@
                 await recordStudyActivity();
                 await recordReviewOutcome(grade);
 
+                dropStaleStableCandidates();
                 if (grade >= 3 && shouldSuggestMastered(card)) {
                     if (!sessionStableCandidates.some(c => c.id === card.id)) {
                         sessionStableCandidates.push(card);
@@ -4275,6 +4441,15 @@ Back: Красивый</pre>
                 }
                 if (importedFolders.some(f => !f.id || !f.name || !Array.isArray(f.cards))) {
                     throw new Error('Неверный формат данных (отсутствуют обязательные поля)');
+                }
+                // Выгрузка без единой карточки — это либо обрезанный файл, либо копия,
+                // снятая в момент, когда данные не загрузились. Заменить ею живую
+                // колоду значит стереть всё, и рубеж от обнуления здесь не срабатывает:
+                // импорт идёт через withIntentionalChange, то есть помечен как намеренный.
+                // Поэтому отказываем раньше — до вопроса «добавить или заменить».
+                const importedCardCount = importedFolders.reduce((n, f) => n + (f.cards || []).length, 0);
+                if (importedCardCount === 0 && countAllCards(folders) > 0) {
+                    throw new Error('В файле нет ни одной карточки. Импорт отменён, чтобы не стереть ваши слова.');
                 }
                 const choice = await showImportChoiceModal();
                 if (choice === null) return;
