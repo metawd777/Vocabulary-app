@@ -509,11 +509,11 @@
         // новая версия, а не старая копия из кеша браузера. Именно эта
         // неизвестность заставляла удалять приложение с экрана — а удаление
         // уничтожает сохранённые слова.
-        const APP_VERSION = '2026.08.01';
-        // Метка сборки. Её смысл — отличить загруженный файл от старого прямо на
-        // телефоне, поэтому обновлять её ОБЯЗАТЕЛЬНО при каждой правке приложения.
-        // До 18.08.2026 она не обновлялась ни разу и показывала '1 августа' на любой
-        // версии — то есть врала ровно в том единственном случае, ради которого нужна.
+        // Метка сборки ставится руками при правке приложения.
+        // Ниже, в настройках, рядом с ней показывается дата самого файла, которую
+        // сообщает сервер: её забыть невозможно. Отдельная константа APP_VERSION
+        // убрана — она не обновлялась ни разу с 1 августа и показывала эту дату на
+        // любой сборке, то есть врала ровно в том случае, ради которого нужна.
         const APP_BUILD_LABEL = '18 августа 2026';
 
         const CONSTANTS = {
@@ -2267,8 +2267,7 @@
 
         async function moveEditingCardToMastered() {
             if (!editingCardId) return;
-            const folder = getCurrentFolder();
-            const card = folder.cards.find(c => c.id === editingCardId);
+            const { card, folder } = findCardAndFolderById(editingCardId);
             if (!card) return;
             const ok = await showConfirmModal('Переместить в архив', 'Переместить эту карточку в «Изученные слова»?', { confirmLabel: 'Переместить', danger: false });
             if (!ok) return;
@@ -3538,8 +3537,7 @@
         }
 
         function viewCard(cardId) {
-            const folder = getCurrentFolder();
-            const card = folder.cards.find(c => c.id === cardId);
+            const { card, folder } = findCardAndFolderById(cardId);
             if (!card) return;
             viewingCardId = cardId;
             const content = document.getElementById('card-view-content');
@@ -3580,8 +3578,7 @@
             document.getElementById('cardViewModal').classList.add('hidden');
             document.getElementById('cardViewModal').classList.remove('flex');
             if (viewingCardId) {
-                const folder = getCurrentFolder();
-                const card = folder.cards.find(c => c.id === viewingCardId);
+                const { card, folder } = findCardAndFolderById(viewingCardId);
                 if (card && card._imageObjectUrl) {
                     URL.revokeObjectURL(card._imageObjectUrl);
                     card._imageObjectUrl = null;
@@ -3597,8 +3594,7 @@
         async function resetFromViewModal() {
             const ok = await showConfirmModal('Сбросить прогресс', 'Сбросить прогресс этой карточки?', { confirmLabel: 'Сбросить' });
             if (!ok) return;
-            const folder = getCurrentFolder();
-            const card = folder.cards.find(c => c.id === viewingCardId);
+            const { card, folder } = findCardAndFolderById(viewingCardId);
             if (card) {
                 resetCardProgress(card);
                 await saveData();
@@ -3833,8 +3829,7 @@
 
         // ==================== РЕДАКТИРОВАНИЕ ====================
         function editCard(cardId, context = 'folder') {
-            const folder = getCurrentFolder();
-            const card = folder.cards.find(c => c.id === cardId);
+            const { card, folder } = findCardAndFolderById(cardId);
             if (!card) return;
             editingCardId = cardId;
             editContext = context;
@@ -3868,8 +3863,7 @@
         }
 
         async function saveEditedCard() {
-            const folder = getCurrentFolder();
-            const card = folder.cards.find(c => c.id === editingCardId);
+            const { card, folder } = findCardAndFolderById(editingCardId);
             if (!card) return;
             card.english = document.getElementById('edit-english').value.trim();
             card.russian = document.getElementById('edit-russian').value.trim();
@@ -3906,8 +3900,7 @@
         async function deleteCurrentCard() {
             const ok = await showConfirmModal('Удалить карточку', 'Удалить эту карточку? Это действие необратимо.', { confirmLabel: 'Удалить' });
             if (!ok) return;
-            const folder = getCurrentFolder();
-            const card = folder.cards.find(c => c.id === editingCardId);
+            const { card, folder } = findCardAndFolderById(editingCardId);
             if (card) {
                 if (card._imageObjectUrl) URL.revokeObjectURL(card._imageObjectUrl);
                 if (card.imageId) await MediaStore.deleteImage(card.imageId);
@@ -3922,8 +3915,7 @@
         async function resetCardProgressFromModal() {
             const ok = await showConfirmModal('Сбросить прогресс', 'Сбросить прогресс этой карточки?', { confirmLabel: 'Сбросить' });
             if (!ok) return;
-            const folder = getCurrentFolder();
-            const card = folder.cards.find(c => c.id === editingCardId);
+            const { card, folder } = findCardAndFolderById(editingCardId);
             if (!card) return;
             resetCardProgress(card);
             await saveData();
@@ -4256,6 +4248,15 @@
         // вообще: код и сохранённые слова живут раздельно, обновление кода не
         // может стереть колоды. Сначала скачиваем свежую страницу минуя кеш
         // (это заодно обновляет и сам кеш), потом перезагружаемся.
+        // Дата самого файла со слов сервера. В отличие от константы её нельзя
+        // забыть обновить: если Safari отдал старую копию из кэша, здесь будет
+        // старая дата, и это видно сразу, без гаданий.
+        function фактическаяДатаФайла() {
+            const d = new Date(document.lastModified);
+            if (isNaN(d)) return 'неизвестно';
+            return d.toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+
         async function forceUpdateApp() {
             const ok = await showConfirmModal(
                 'Обновить приложение',
@@ -4607,8 +4608,8 @@ Back: Красивый</pre>
                     </div>
                     <div class="panel">
                         <div class="font-semibold text-base mb-3">Версия и обновление</div>
-                        <div class="text-sm mb-1">Версия <b>${APP_VERSION}</b></div>
-                        <div class="text-xs text-slate-400 dark:text-slate-500 mb-3">Сборка от ${APP_BUILD_LABEL}</div>
+                        <div class="text-sm mb-1">Сборка от <b>${APP_BUILD_LABEL}</b></div>
+                        <div class="text-xs text-slate-400 dark:text-slate-500 mb-3">Файл от ${фактическаяДатаФайла()}</div>
                         <button onclick="forceUpdateApp()" class="w-full py-3 rounded-xl bg-teal-600 text-white font-medium text-base touch-target mb-3">Проверить обновление</button>
                         <div class="text-xs text-slate-500 dark:text-slate-400 leading-snug">
                             Обновление кода <b>никогда не удаляет ваши слова</b> — они хранятся отдельно.<br>
