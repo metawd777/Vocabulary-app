@@ -1988,6 +1988,27 @@
             return { total, statNew, statLearning, statReview, statRelearning, totalReps, totalLapses, percentCorrect, answeredTotal, answeredCorrect, avgStability, learnedCount, totalImages, totalFlips, maxConsecutiveCorrect, todayStats, masteredCount, maxInterval, cardsWithStabilityOver100, leechCount };
         }
 
+        // Показ списка карточек за строкой статистики. Один способ на все такие
+        // списки: раньше его умел строить только перечень трудных слов, и третья
+        // копия того же кода означала бы, что одну ошибку придётся чинить трижды.
+        const CARD_LIST_LIMIT = 60;
+        function showCardListModal(заголовок, пояснение, карточки, подпись, пусто) {
+            if (!карточки || карточки.length === 0) {
+                showAlertModal(заголовок, пусто, 'Понятно');
+                return;
+            }
+            const ПЕРЕВОД = String.fromCharCode(10);   // без escape: они не переживают правку скриптом
+            const показать = карточки.slice(0, CARD_LIST_LIMIT);
+            const перечень = показать.map(c => {
+                const хвост = подпись ? ' (' + подпись(c) + ')' : '';
+                return String(c.english) + ' — ' + String(c.russian) + хвост;
+            }).join(ПЕРЕВОД);
+            const остаток = карточки.length > CARD_LIST_LIMIT
+                ? ПЕРЕВОД + ПЕРЕВОД + '…и ещё ' + (карточки.length - CARD_LIST_LIMIT) + '. Показаны первые ' + CARD_LIST_LIMIT + '.'
+                : '';
+            showAlertModal(заголовок, пояснение + ПЕРЕВОД + ПЕРЕВОД + перечень + остаток, 'Понятно');
+        }
+
         function showLeechList() {
             const leeches = [];
             folders.forEach(f => {
@@ -1996,16 +2017,43 @@
                     if ((c.lapses || 0) >= LEECH_THRESHOLD) leeches.push(c);
                 });
             });
-            if (leeches.length === 0) {
-                showAlertModal('Трудные слова', 'Пока нет слов с 8+ провалами — отлично!', 'Понятно');
-                return;
-            }
             leeches.sort((a, b) => (b.lapses || 0) - (a.lapses || 0));
-            const lines = leeches.map(c => `${c.english} — ${c.russian} (провалов: ${c.lapses})`).join('\n');
-            showAlertModal(
+            showCardListModal(
                 'Трудные слова',
-                'Эти слова алгоритм показывает снова и снова, а вы всё равно их забываете — обычно дело не в памяти, а в самой карточке. Попробуйте переформулировать, разбить на два более простых слова или добавить картинку-подсказку:\n\n' + lines,
-                'Понятно'
+                'Эти слова алгоритм показывает снова и снова, а вы всё равно их забываете — обычно дело не в памяти, а в самой карточке. Попробуйте переформулировать, разбить на два более простых слова или добавить картинку-подсказку:',
+                leeches,
+                c => 'провалов: ' + (c.lapses || 0),
+                'Пока нет слов с ' + LEECH_THRESHOLD + '+ провалами — отлично!'
+            );
+        }
+
+        // Слова, которые владелец сам признал выученными и убрал из показа.
+        function showMasteredList() {
+            const mastered = (folders.find(f => f.system) || { cards: [] }).cards.slice();
+            mastered.sort((a, b) => (b.stability || 0) - (a.stability || 0));
+            showCardListModal(
+                'Изученные слова',
+                'Эти слова лежат в колоде «Изученные слова» и в обучении больше не показываются. Вернуть любое можно из самой колоды.',
+                mastered,
+                c => c.stability ? 'держится ~' + Math.round(c.stability) + ' дн.' : 'без оценки',
+                'Здесь пока пусто. Слова попадают сюда, когда вы отправляете их в «Изученные слова» — приложение само предложит это, когда слово станет держаться долго.'
+            );
+        }
+
+        // Слова, которые уже знали, но недавно забыли.
+        function showRelearningList() {
+            const список = [];
+            folders.forEach(f => {
+                if (f.system) return;
+                f.cards.forEach(c => { if (c.state === 'relearning') список.push(c); });
+            });
+            список.sort((a, b) => (b.lapses || 0) - (a.lapses || 0));
+            showCardListModal(
+                'Переучиваются',
+                'Это слова, которые вы уже знали, но недавно ответили на них «Снова». Они возвращаются на короткие интервалы, пока не закрепятся заново, а затем продолжают обычный график повторений.',
+                список,
+                c => 'забываний: ' + (c.lapses || 0),
+                'Сейчас таких слов нет — ничего из выученного не забылось.'
             );
         }
 
@@ -2032,7 +2080,7 @@
             // ---- Первые шаги ----
             { id: 'first_step', icon: '🌱', title: 'Первый шаг', desc: 'Начать повторять первое слово', category: 'Активность', check: (g) => g.learnedCount >= 1 },
             { id: 'first_photo', icon: '📷', title: 'Первое фото', desc: 'Добавить фото к слову', category: 'Контент', check: (g) => g.totalImages >= 1 },
-            { id: 'first_archive', icon: '🏆', title: 'Первый архив', desc: 'Отправить первое слово в архив', category: 'Контент', check: (g) => g.masteredCount >= 1 },
+            { id: 'first_archive', icon: '🏆', title: 'Первое запомненное', desc: 'Запомнить первое слово', category: 'Контент', check: (g) => g.masteredCount >= 1 },
 
             // ---- Привычка (серии дней) ----
             { id: 'streak_3', icon: '🔥', title: 'Разминка', desc: 'Заниматься 3 дня подряд', category: 'Серия дней', check: (g, streak) => streak >= 3 },
@@ -2043,10 +2091,10 @@
             // ---- Объём выученного ----
             // Считается по архиву: выученным словом владелец считает то, которое
             // отправлено в «Изученные слова», а не то, что дошло до повторений.
-            { id: 'learned_10', icon: '📚', title: 'Первые десять', desc: 'Отправить в архив 10 слов', category: 'Объём', check: (g) => g.masteredCount >= 10 },
-            { id: 'learned_50', icon: '📚', title: 'Полсотни', desc: 'Отправить в архив 50 слов', category: 'Объём', check: (g) => g.masteredCount >= 50 },
-            { id: 'learned_200', icon: '📚', title: 'Двести', desc: 'Отправить в архив 200 слов', category: 'Объём', check: (g) => g.masteredCount >= 200 },
-            { id: 'learned_500', icon: '📚', title: 'Пятьсот', desc: 'Отправить в архив 500 слов', category: 'Объём', check: (g) => g.masteredCount >= 500 },
+            { id: 'learned_10', icon: '📚', title: 'Первые десять', desc: 'Запомнить 10 слов', category: 'Объём', check: (g) => g.masteredCount >= 10 },
+            { id: 'learned_50', icon: '📚', title: 'Полсотни', desc: 'Запомнить 50 слов', category: 'Объём', check: (g) => g.masteredCount >= 50 },
+            { id: 'learned_200', icon: '📚', title: 'Двести', desc: 'Запомнить 200 слов', category: 'Объём', check: (g) => g.masteredCount >= 200 },
+            { id: 'learned_500', icon: '📚', title: 'Пятьсот', desc: 'Запомнить 500 слов', category: 'Объём', check: (g) => g.masteredCount >= 500 },
 
             // ---- Качество FSRS ----
             { id: 'long_memory_90', icon: '🧠', title: 'Долгая память', desc: 'Довести интервал повторения слова до 90 дней', category: 'Интенсивность', check: (g) => g.maxInterval >= 90 },
@@ -2061,7 +2109,11 @@
 
             // ---- Престижные (дальний горизонт, месяцы регулярной практики) ----
             { id: 'anniversary', icon: '🎂', title: 'Годовщина', desc: 'Заниматься 365 дней подряд', category: 'Особые', check: (g, streak) => streak >= 365 },
-            { id: 'thousand', icon: '🏅', title: 'Тысяча', desc: 'Отправить в архив 1000 слов, занимаясь минимум 90 разных дней', category: 'Особые', check: (g) => g.masteredCount >= 1000 && (stats.studyDates?.length || 0) >= 90 },
+            // Условие про 90 дней здесь раньше ничего не сторожило: тысячу слов до
+            // состояния «запомнил» быстрее и не довести. Заменено на число ответов —
+            // оно растёт только от настоящей работы и не подделывается импортом:
+            // у ввезённых карточек счётчик повторов нулевой.
+            { id: 'reps_5000', icon: '🏅', title: 'Пять тысяч', desc: 'Ответить на карточки 5000 раз', category: 'Особые', check: (g) => g.totalReps >= 5000 },
             { id: 'eternity', icon: '♾️', title: 'Вечность', desc: 'Довести интервал повторения слова до 365 дней', category: 'Особые', check: (g) => g.maxInterval >= 365 },
         ];
 
@@ -2240,8 +2292,8 @@
                             <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Новые</span><span class="font-medium">${g.statNew}</span></div>
                             <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Изучаются</span><span class="font-medium">${g.statLearning}</span></div>
                             <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">На повторении</span><span class="font-medium">${g.statReview}</span></div>
-                            <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Выучено</span><span class="font-medium">${g.masteredCount}</span></div>
-                            <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400 border-b border-dotted border-slate-400 dark:border-slate-500" onclick="showAlertModal('Переучиваются', 'Это слова, которые вы уже знали, но недавно ответили на них «Снова» — забыли. Они возвращаются на короткие интервалы, пока не закрепятся заново, а затем продолжают обычный график повторений.', 'Понятно')">Переучиваются ⓘ</span><span class="font-medium">${g.statRelearning}</span></div>
+                            <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400 border-b border-dotted border-slate-400 dark:border-slate-500" onclick="showMasteredList()">Выучено ⓘ</span><span class="font-medium">${g.masteredCount}</span></div>
+                            <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400 border-b border-dotted border-slate-400 dark:border-slate-500" onclick="showRelearningList()">Переучиваются ⓘ</span><span class="font-medium">${g.statRelearning}</span></div>
                             <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400 border-b border-dotted border-slate-400 dark:border-slate-500" onclick="showLeechList()">Трудные слова ⓘ</span><span class="font-medium">${g.leechCount}</span></div>
                         </div>
                     </div>
@@ -2269,7 +2321,7 @@
             if (!editingCardId) return;
             const { card, folder } = findCardAndFolderById(editingCardId);
             if (!card) return;
-            const ok = await showConfirmModal('Переместить в архив', 'Переместить эту карточку в «Изученные слова»?', { confirmLabel: 'Переместить', danger: false });
+            const ok = await showConfirmModal('Переместить в «Изученные»', 'Переместить эту карточку в «Изученные слова»?', { confirmLabel: 'Переместить', danger: false });
             if (!ok) return;
             await moveCardToMastered(card);
             sessionStableCandidates = sessionStableCandidates.filter(c => c.id !== editingCardId);
@@ -2369,7 +2421,7 @@
             let html = `
                 <div onclick="event.stopImmediatePropagation()" class="bg-white dark:bg-slate-800 w-full sm:w-[440px] rounded-t-3xl sm:rounded-3xl p-6 modal-content">
                     <div class="font-semibold text-xl mb-2">Слова, которые вы уверенно помните</div>
-                    <div class="text-sm text-slate-600 dark:text-slate-400 mb-4">Эти слова имеют высокую стабильность. Вы можете отправить их в архив, чтобы они реже повторялись.</div>
+                    <div class="text-sm text-slate-600 dark:text-slate-400 mb-4">Эти слова имеют высокую стабильность. Вы можете перенести их в «Изученные», чтобы они больше не показывались.</div>
                     <div class="max-h-[280px] overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-2xl mb-4">
             `;
             sessionStableCandidates.forEach((card) => {
@@ -2388,7 +2440,7 @@
             html += `
                     </div>
                     <div class="flex flex-col gap-2">
-                        <button onclick="confirmMoveStableWordsToArchive(this)" class="w-full py-3 rounded-2xl bg-emerald-600 text-white font-medium text-base touch-target">Отправить выбранные в архив</button>
+                        <button onclick="confirmMoveStableWordsToArchive(this)" class="w-full py-3 rounded-2xl bg-emerald-600 text-white font-medium text-base touch-target">Перенести выбранные в «Изученные»</button>
                         <button onclick="moveAllStableWordsToArchive(this)" class="w-full py-3 rounded-2xl border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 font-medium text-base touch-target">Отправить все</button>
                         <button onclick="this.closest('.fixed').remove(); clearStableCandidates();" class="w-full py-3 text-sm text-slate-500 dark:text-slate-400 touch-target">Позже</button>
                     </div>
@@ -2972,10 +3024,10 @@
         async function bulkMoveSelectedToMastered() {
             const ids = Array.from(selectedCardIds);
             if (ids.length === 0) return;
-            const ok = await showConfirmModal('В архив', `Отправить ${ids.length} карточек в архив?`, { confirmLabel: 'Переместить', danger: false });
+            const ok = await showConfirmModal('В «Изученные»', `Отправить ${ids.length} карточек в «Изученные»?`, { confirmLabel: 'Переместить', danger: false });
             if (!ok) return;
             await moveSelectedCardsToMastered(ids);
-            await showAlertModal('Готово', `Перемещено ${ids.length} карточек в архив.`);
+            await showAlertModal('Готово', `Перемещено ${ids.length} карточек в «Изученные».`);
             exitSelectionMode();
         }
 
@@ -3096,7 +3148,7 @@
                 </button>
                 <div class="context-menu-divider"></div>
                 <button class="context-menu-item" data-action="move"><i class="fa-solid fa-arrow-right-arrow-left"></i> Переместить в колоду</button>
-                ${folder.system ? '' : `<button class="context-menu-item" data-action="archive"><i class="fa-solid fa-box-archive"></i> В архив</button>`}
+                ${folder.system ? '' : `<button class="context-menu-item" data-action="archive"><i class="fa-solid fa-box-archive"></i> В «Изученные»</button>`}
                 <div class="context-menu-divider"></div>
                 <button class="context-menu-item danger" data-action="delete"><i class="fa-solid fa-trash"></i> Удалить</button>
             `;
@@ -3848,7 +3900,7 @@
                 actionBtn.className = "mt-3 w-full py-3 rounded-xl border border-amber-200 text-amber-600 flex items-center justify-center gap-x-2 text-sm touch-target";
                 actionBtn.onclick = () => returnCardFromMastered(editingCardId);
             } else {
-                actionBtn.innerHTML = `<i class="fa-solid fa-trophy"></i> <span>Переместить в архив</span>`;
+                actionBtn.innerHTML = `<i class="fa-solid fa-trophy"></i> <span>Переместить в «Изученные»</span>`;
                 actionBtn.className = "mt-3 w-full py-3 rounded-xl border border-emerald-200 text-emerald-600 flex items-center justify-center gap-x-2 text-sm touch-target";
                 actionBtn.onclick = moveEditingCardToMastered;
             }
@@ -4574,9 +4626,9 @@ Back: Красивый</pre>
                         </div>
                     </div>
                     <div class="panel">
-                        <div class="font-semibold text-base mb-3">Порог предложения архивации</div>
-                        <label class="text-sm">Предлагать слово в архив, когда интервал повторения достигнет:</label>
-                        <select id="archive-threshold-select" aria-label="Порог предложения архивации" onchange="updateArchiveThreshold(this.value)" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
+                        <div class="font-semibold text-base mb-3">Когда предлагать перенос в «Изученные»</div>
+                        <label class="text-sm">Предлагать перенос в «Изученные», когда интервал повторения достигнет:</label>
+                        <select id="archive-threshold-select" aria-label="Когда предлагать перенос в «Изученные»" onchange="updateArchiveThreshold(this.value)" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-800 text-base touch-target">
                             <option value="30" ${archiveThresholdDays === 30 ? 'selected' : ''}>Раньше — 30 дней</option>
                             <option value="60" ${archiveThresholdDays === 60 ? 'selected' : ''}>Сбалансированно — 60 дней</option>
                             <option value="90" ${archiveThresholdDays === 90 ? 'selected' : ''}>Позже — 90 дней</option>
