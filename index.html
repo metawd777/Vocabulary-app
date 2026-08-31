@@ -146,13 +146,31 @@
         .study-card {
             background: white; border-radius: 24px; border: 1px solid #e2e8f0;
             padding: 20px 16px; min-height: 200px; width: 100%; height: 100%;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
             position: relative;
             max-width: 100%;
             overflow: hidden;
             box-sizing: border-box;
         }
         .dark .study-card { background:#1e293b; border-color:#334155; }
+
+        /* Карточка обучения — три ряда: шапка с кнопками, содержимое, подпись.
+           Раньше кнопки висели поверх содержимого абсолютным позиционированием,
+           то есть места в раскладке не занимали, и длинный текст затекал под них.
+           Ряды решают это по устройству, а не подобранным отступом: под кнопку
+           нечему затекать, когда она занимает собственную строку. */
+        .study-card-head {
+            flex: 0 0 auto; width: 100%; display: grid;
+            grid-template-columns: 40px 1fr 40px; align-items: center; min-height: 40px;
+        }
+        .study-card-head .study-card-photo { justify-self: center; }
+        .study-card-head .study-card-menu { justify-self: end; }
+        .study-card-body {
+            flex: 1 1 auto; min-height: 0; width: 100%; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+        .study-card-foot { flex: 0 0 auto; width: 100%; min-height: 22px; display: flex; align-items: flex-end; }
 
         /* Строка списка карточек. Одно слово без пробелов — немецкое сложное,
            ссылка, химический термин — не переносится и выталкивает строку за
@@ -242,9 +260,6 @@
         @keyframes fadeInUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
 
         #undo-review-btn {
-            position: absolute;
-            top: 12px;
-            left: 12px;
             width: 40px;
             height: 40px;
             border-radius: 9999px;
@@ -535,6 +550,10 @@
         let editingCardId = null;
         let viewingCardId = null;
         let editContext = 'folder';
+        // Значения полей стабильности и сложности в том виде, в каком их показали
+        // при открытии окна правки (см. editCard).
+        let editShownStability = '';
+        let editShownDifficulty = '';
         let stats = { studyDates: [], unlocked: {}, dailyStats: {}, consecutiveCorrect: 0, maxConsecutiveCorrect: 0, totalFlips: 0, totalImages: 0, longestStreak: 0, newShownToday: { date: null, count: 0 }, reviewsShownToday: { date: null, count: 0 }, pureReviewsShownToday: { date: null, count: 0 }, stableCandidates: { date: null, ids: [] } };
         let lastReviewedCard = null;
         // Если чтение колод с диска не удалось, запись ЗАПРЕЩЕНА: иначе пустая
@@ -3401,7 +3420,7 @@
                 // свободное от всех трёх. Смещение задано инлайном, а не
                 // классом, чтобы не зависеть от того, собран ли в этой сборке
                 // Tailwind-класс -translate-x-1/2.
-                addPhotoHtml = `<button onclick="uploadImageForCurrentCard(event)" aria-label="Добавить фото" style="left:50%; transform:translateX(-50%);" class="absolute top-3 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 touch-target">
+                addPhotoHtml = `<button onclick="uploadImageForCurrentCard(event)" aria-label="Добавить фото" class="study-card-photo w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 touch-target">
                      <i class="fa-solid fa-camera text-lg"></i>
                    </button>`;
             }
@@ -3409,7 +3428,7 @@
             let folderLabelHTML = '';
             if (card.folderName) {
                 folderLabelHTML = `
-                    <div class="absolute bottom-3 left-3 px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-xs text-slate-500 dark:text-slate-400 rounded-full">
+                    <div class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-xs text-slate-500 dark:text-slate-400 rounded-full">
                         ${escapeHtml(card.folderName)}
                     </div>
                 `;
@@ -3426,24 +3445,28 @@
                     ${progressHtml}
                     <div class="study-card-wrapper">
                         <div class="study-card card-enter" onclick="flipStudyCard()">
-                            <button onclick="editCurrentStudyCard(event)" class="absolute top-3 right-3 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 touch-target">
-                                <i class="fa-solid fa-ellipsis-vertical text-xl"></i>
-                            </button>
-                            ${addPhotoHtml}
-                            ${imageHtml}
-                            <div id="card-front">
-                                <div class="word-english">${escapeHtml(card.english)}</div>
+                            <div class="study-card-head">
+                                <button id="undo-review-btn" onclick="event.stopImmediatePropagation(); undoLastReview()" title="Отменить последнюю оценку">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                </button>
+                                ${addPhotoHtml}
+                                <button onclick="editCurrentStudyCard(event)" aria-label="Действия с карточкой" class="study-card-menu w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 touch-target">
+                                    <i class="fa-solid fa-ellipsis-vertical text-xl"></i>
+                                </button>
                             </div>
-                            <div id="card-back" class="hidden">
-                                <div class="word-russian">${escapeHtml(card.russian)}</div>
+                            <div class="study-card-body">
+                                ${imageHtml}
+                                <div id="card-front">
+                                    <div class="word-english">${escapeHtml(card.english)}</div>
+                                </div>
+                                <div id="card-back" class="hidden">
+                                    <div class="word-russian">${escapeHtml(card.russian)}</div>
+                                </div>
+                                <button onclick="event.stopImmediatePropagation(); speakCurrentWord()" class="speak-btn">
+                                    <i class="fa-solid fa-volume-up"></i>
+                                </button>
                             </div>
-                            <button onclick="event.stopImmediatePropagation(); speakCurrentWord()" class="speak-btn">
-                                <i class="fa-solid fa-volume-up"></i>
-                            </button>
-                            ${folderLabelHTML}
-                            <button id="undo-review-btn" onclick="event.stopImmediatePropagation(); undoLastReview()" title="Отменить последнюю оценку">
-                                <i class="fa-solid fa-rotate-left"></i>
-                            </button>
+                            <div class="study-card-foot">${folderLabelHTML}</div>
                         </div>
                     </div>
                     <div class="rating-buttons">
@@ -3674,18 +3697,23 @@
         function fitStudyCardContent() {
             const cardEl = document.querySelector('.study-card');
             if (!cardEl) return;
+            // Мерить надо область содержимого, а не карточку целиком: после
+            // разделения на ряды карточка сама не растёт, растёт тело внутри неё.
+            // Если мерить карточку, длинный текст перестанет ужиматься и просто
+            // обрежется — а он должен помещаться целиком, как раньше.
+            const измеряемый = cardEl.querySelector('.study-card-body') || cardEl;
             const isSmallScreen = window.innerWidth <= 480;
             const baseEnglish = isSmallScreen ? 2 : 2.5;
             const baseRussian = isSmallScreen ? 1.6 : 2;
             const baseImgHeight = 140;
             const minEnglish = 1.15, minRussian = 1.05, minImgHeight = 60;
             let scale = 1;
-            cardEl.style.overflowY = 'hidden';
+            измеряемый.style.overflowY = 'hidden';
             cardEl.style.setProperty('--word-font-english', baseEnglish + 'rem');
             cardEl.style.setProperty('--word-font-russian', baseRussian + 'rem');
             cardEl.style.setProperty('--img-max-height', baseImgHeight + 'px');
             for (let step = 0; step < 18; step++) {
-                if (cardEl.scrollHeight <= cardEl.clientHeight + 1) break;
+                if (измеряемый.scrollHeight <= измеряемый.clientHeight + 1) break;
                 scale -= 0.06;
                 if (scale <= CONSTANTS.MIN_STUDY_FONT_SCALE) break;
                 const eng = Math.max(minEnglish, baseEnglish * scale);
@@ -3697,9 +3725,11 @@
                     cardEl.style.setProperty('--img-max-height', imgH + 'px');
                 }
             }
-            if (cardEl.scrollHeight > cardEl.clientHeight + 1) {
-                cardEl.style.overflowY = 'auto';
-                cardEl.style.webkitOverflowScrolling = 'touch';
+            // Если даже на самом мелком шрифте не влезло — пусть прокручивается
+            // содержимое, а не карточка: кнопки в шапке должны остаться на месте.
+            if (измеряемый.scrollHeight > измеряемый.clientHeight + 1) {
+                измеряемый.style.overflowY = 'auto';
+                измеряемый.style.webkitOverflowScrolling = 'touch';
             }
         }
 
@@ -3889,6 +3919,13 @@
             document.getElementById('edit-russian').value = card.russian;
             document.getElementById('edit-stability').value = card.stability !== undefined ? card.stability.toFixed(2) : '';
             document.getElementById('edit-difficulty').value = card.difficulty !== undefined ? card.difficulty.toFixed(2) : '';
+            // Запоминаем ровно то, что показали. Сравнивать при сохранении надо с
+            // этим, а не с исходным числом: в поле уходит округление до сотых, и
+            // 10.74 никогда не совпадёт с 10.739581140068516. Из-за этого
+            // предупреждение о правке параметров FSRS появлялось даже тогда, когда
+            // владелец ничего не трогал, — и обесценивалось.
+            editShownStability = document.getElementById('edit-stability').value;
+            editShownDifficulty = document.getElementById('edit-difficulty').value;
             document.getElementById('edit-state').value = card.state || 'new';
             const d = new Date(card.nextReviewDate);
             document.getElementById('edit-next-date').value = d.toISOString().split('T')[0];
@@ -3923,8 +3960,8 @@
             const difficultyVal = document.getElementById('edit-difficulty').value.trim();
             const newStability = stabilityVal !== '' ? parseFloat(stabilityVal) : undefined;
             const newDifficulty = difficultyVal !== '' ? parseFloat(difficultyVal) : undefined;
-            const stabilityChanged = newStability !== card.stability;
-            const difficultyChanged = newDifficulty !== card.difficulty;
+            const stabilityChanged = stabilityVal !== editShownStability;
+            const difficultyChanged = difficultyVal !== editShownDifficulty;
             if ((stabilityVal !== '' && isNaN(newStability)) || (difficultyVal !== '' && isNaN(newDifficulty))) {
                 await showAlertModal('Некорректное значение', 'Введены некорректные числовые значения. Будет использовано безопасное значение.');
             }
@@ -3932,8 +3969,12 @@
                 const ok = await showConfirmModal('Изменение параметров FSRS', 'Вы меняете параметры FSRS (Стабильность/Сложность). Это может изменить расписание повторений. Продолжить?', { confirmLabel: 'Продолжить', danger: false });
                 if (!ok) return;
             }
-            card.stability = newStability !== undefined ? safeStability(newStability) : undefined;
-            card.difficulty = newDifficulty !== undefined ? safeDifficulty(newDifficulty) : undefined;
+            // Трогаем параметры только если их правда правили. Иначе открытие и
+            // сохранение карточки без единой правки округляло бы стабильность до
+            // сотых — 10.7395… превращалось в 10.74, — то есть тихо меняло
+            // расписание за спиной владельца.
+            if (stabilityChanged) card.stability = newStability !== undefined ? safeStability(newStability) : undefined;
+            if (difficultyChanged) card.difficulty = newDifficulty !== undefined ? safeDifficulty(newDifficulty) : undefined;
             card.state = document.getElementById('edit-state').value;
             // Если выбран статус "На повторении"/"Переучивается", но Stability/Difficulty
             // не заданы — не оставляем карточку в противоречивом состоянии до следующей
